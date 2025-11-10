@@ -2,41 +2,41 @@
 ================================================================================
 TEST E2E - FLUJO COMPLETO DE VIAJE
 ================================================================================
-Fecha: 2025-11-07 13:32:38
-Código de Viaje: TEST_FLOW_20251107133238
+Fecha: 2025-11-10 16:12:20
+Código de Viaje: TEST_FLOW_20251110161220
 Usuario: +5214771817823
 Conductor: +5214775589835
 Base URL: http://localhost:8000/api/v1
 ================================================================================
 
-[13:32:38] [START] INICIO DEL TEST E2E
-[13:32:38] [INFO] Requisitos previos listados al usuario
-[13:32:43] [USER_INPUT] Usuario confirmó inicio del test
-[13:32:43] [CHECK] [CHECK] Verificando servidor...
-[13:32:45] [SUCCESS] [OK] Servidor activo
-[13:32:45] [INFO]   - Status: ok
-[13:32:45] [INFO]   - Service: unknown
-[13:32:45] [INFO]   - Timestamp: 2025-11-07T19:32:45.193830
-[13:32:45] [CHECK] [CHECK] Configuración de Webhook Evolution API
-[13:32:45] [INFO] Webhook esperado: https://postasthmatic-dicycly-veda.ngrok-free.dev/api/v1/whatsapp/messages
-[13:32:46] [USER_INPUT] Usuario respondió: s
-[13:32:46] [SUCCESS] Webhook confirmado como configurado
-[13:32:46] [INFO] Código único de viaje: TEST_FLOW_20251107133238
-[13:32:46] [INFO] 
+[16:12:20] [START] INICIO DEL TEST E2E
+[16:12:20] [INFO] Requisitos previos listados al usuario
+[16:12:21] [USER_INPUT] Usuario confirmó inicio del test
+[16:12:21] [CHECK] [CHECK] Verificando servidor...
+[16:12:23] [SUCCESS] [OK] Servidor activo
+[16:12:23] [INFO]   - Status: ok
+[16:12:23] [INFO]   - Service: unknown
+[16:12:23] [INFO]   - Timestamp: 2025-11-10T22:12:23.983924
+[16:12:26] [CHECK] [CHECK] Configuración de Webhook Evolution API
+[16:12:26] [INFO] Webhook esperado: https://postasthmatic-dicycly-veda.ngrok-free.dev/api/v1/whatsapp/messages
+[16:12:28] [USER_INPUT] Usuario respondió: s
+[16:12:28] [SUCCESS] Webhook confirmado como configurado
+[16:12:28] [INFO] Código único de viaje: TEST_FLOW_20251110161220
+[16:12:28] [INFO] 
 ================================================================================
-[13:32:46] [INFO]                   FASE 1: CREACIÓN DE VIAJE (Simula Floatify)                   
-[13:32:46] [INFO] ================================================================================
+[16:12:28] [INFO]                   FASE 1: CREACIÓN DE VIAJE (Simula Floatify)                   
+[16:12:28] [INFO] ================================================================================
 
-[13:32:46] [REQUEST] 
+[16:12:28] [REQUEST] 
 [POST] /trips/create
-[13:32:46] [REQUEST] Payload (JSON):
-[13:32:46] [DATA] {
+[16:12:28] [REQUEST] Payload (JSON):
+[16:12:28] [DATA] {
   "event": "whatsapp.group.create",
   "action": "create_group",
   "tenant_id": 24,
   "trip": {
     "id": 45,
-    "code": "TEST_FLOW_20251107133238",
+    "code": "TEST_FLOW_20251110161220",
     "status": "asignado",
     "planned_start": "2025-10-06T20:00:00-06:00",
     "planned_end": "2025-10-06T22:00:00-06:00",
@@ -93,105 +93,72 @@ Base URL: http://localhost:8000/api/v1
     "priority": "medium"
   }
 }
-[13:32:52] [RESPONSE] Status Code: 200
-[13:32:52] [RESPONSE] Response (JSON):
-[13:32:52] [DATA] {
+[16:12:34] [RESPONSE] Status Code: 200
+[16:12:34] [RESPONSE] Response (JSON):
+[16:12:34] [DATA] {
   "success": true,
-  "trip_id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
-  "trip_code": "TEST_FLOW_20251107133238",
-  "whatsapp_group_id": "120363422139022976@g.us",
+  "trip_id": "5b13fb93-be82-11f0-b0de-f4b5205b5b70",
+  "trip_code": "TEST_FLOW_20251110161220",
+  "whatsapp_group_id": "120363423255727761@g.us",
   "welcome_message_sent": true,
   "message": "Viaje creado exitosamente"
 }
-[13:32:52] [SUCCESS] [OK] Request exitoso
-[13:32:52] [SUCCESS] [OK] Mensaje de bienvenida enviado
-[13:32:52] [USER_ACTION] >>> Viaje creado. Revisa tu WhatsApp (+5214771817823):
-  - Deberías ser agregado al grupo '120363422139022976@g.us'
+[16:12:34] [SUCCESS] [OK] Request exitoso
+[16:12:34] [SUCCESS] [OK] Mensaje de bienvenida enviado
+[16:12:34] [USER_ACTION] >>> Viaje creado. Revisa tu WhatsApp (+5214771817823):
+  - Deberías ser agregado al grupo '120363423255727761@g.us'
   - Deberías ver un mensaje de bienvenida del bot
-  - El mensaje debería mencionar el viaje 'TEST_FLOW_20251107133238'
+  - El mensaje debería mencionar el viaje 'TEST_FLOW_20251110161220'
   - El grupo incluye a ambos participantes
-[13:32:52] [PAUSE] Esperando acción del usuario...
-[13:32:55] [RESUME] Usuario confirmó. Continuando...
-[13:32:56] [INFO] Verificando BD para trip_id: 8b1be776-bc10-11f0-8bb1-f4b5205b5b70
-[13:32:56] [INFO] Estado Esperado: pending -> NULL
-[13:32:56] [INFO] [OK] Status Actual: pending
-[13:32:56] [INFO] [OK] Substatus Actual: NULL
-[13:32:58] [INFO] 
+[16:12:34] [PAUSE] Esperando acción del usuario...
+[16:12:49] [RESUME] Usuario confirmó. Continuando...
+[16:12:50] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:12:50] [INFO] Estado Esperado: pending -> NULL
+[16:12:50] [INFO] [OK] Status Actual: pending
+[16:12:50] [INFO] [OK] Substatus Actual: NULL
+[16:12:52] [INFO] 
 ================================================================================
-[13:32:58] [INFO] MESSAGING CHECK - Trip: 8b1be776-bc10-11f0-8bb1-f4b5205b5b70, Group: 120363422139022976@g.us
-[13:32:58] [INFO] ================================================================================
-[13:32:58] [INFO] [UNIT] ID: 8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70, Name: Torton 309 41BB3T
-[13:32:58] [INFO] [UNIT] WhatsApp Group ID: 120363422139022976@g.us
-[13:32:58] [INFO] [UNIT] WhatsApp Group Name: Unidad Torton 309 41BB3T - 41BB3T
-[13:32:58] [INFO] [CONVERSATION] ID: 8c355c4b-bc10-11f0-8bb1-f4b5205b5b70, Status: active
-[13:32:58] [INFO] [CONVERSATION] Group ID: 120363422139022976@g.us
-[13:32:58] [ERROR] [ERROR] No hay mensajes en la tabla messages
-[13:32:58] [WARNING] [WARNING] No hay interacciones de IA registradas
-[13:32:58] [INFO] ================================================================================
+[16:12:52] [INFO] MESSAGING CHECK - Trip: 5b13fb93-be82-11f0-b0de-f4b5205b5b70, Group: 120363423255727761@g.us
+[16:12:52] [INFO] ================================================================================
+[16:12:52] [INFO] [UNIT] ID: 5b12ee57-be82-11f0-b0de-f4b5205b5b70, Name: Torton 309 41BB3T
+[16:12:52] [INFO] [UNIT] WhatsApp Group ID: 120363423255727761@g.us
+[16:12:52] [INFO] [UNIT] WhatsApp Group Name: Unidad Torton 309 41BB3T - 41BB3T
+[16:12:52] [INFO] [CONVERSATION] ID: 5c18f11b-be82-11f0-b0de-f4b5205b5b70, Status: active
+[16:12:52] [INFO] [CONVERSATION] Group ID: 120363423255727761@g.us
+[16:12:52] [ERROR] [ERROR] No hay mensajes en la tabla messages
+[16:12:52] [WARNING] [WARNING] No hay interacciones de IA registradas
+[16:12:52] [INFO] ================================================================================
 
-[13:32:58] [INFO] 
+[16:12:52] [INFO] 
 ================================================================================
-[13:32:58] [INFO]                   FASE 2: INICIO DE VIAJE (Simula Escaneo QR)                   
-[13:32:58] [INFO] ================================================================================
+[16:12:52] [INFO]                   FASE 2: INICIO DE VIAJE (Simula Escaneo QR)                   
+[16:12:52] [INFO] ================================================================================
 
-[13:32:58] [REQUEST] 
-[POST] /trips/status-change
-[13:32:58] [REQUEST] Payload (JSON):
-[13:32:58] [DATA] {
-  "event": "trip.status.changed",
-  "timestamp": 1762543978,
-  "tenant_id": 24,
-  "trip_id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
-  "trip_code": "TEST_FLOW_20251107133238",
-  "from_status": "asignado",
-  "to_status": "en_ruta_carga",
-  "trigger": "qr_scan",
-  "substatus": "rumbo_a_zona_carga",
-  "trip": {
-    "id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
-    "code": "TEST_FLOW_20251107133238",
-    "tenant_id": 24
-  },
-  "driver": {
-    "id": 33,
-    "name": "PRUEBA_FLOWTIFY",
-    "phone": "+5214775589835"
-  },
-  "unit": {
-    "id": 18,
-    "name": "Torton 309 41BB3T",
-    "qr_token": "QR-ABC-123"
-  },
-  "metadata": {
-    "location": {
-      "lat": 21.0593683,
-      "lon": -101.7722416
-    }
-  }
-}
-[13:33:01] [RESPONSE] Status Code: 200
-[13:33:01] [RESPONSE] Response (JSON):
-[13:33:01] [DATA] {
+[16:12:52] [REQUEST] 
+[PUT] /trips/5b13fb93-be82-11f0-b0de-f4b5205b5b70/status?status=en_ruta_carga&substatus=rumbo_a_zona_carga
+[16:12:55] [RESPONSE] Status Code: 200
+[16:12:55] [RESPONSE] Response (JSON):
+[16:12:55] [DATA] {
   "success": true,
-  "message": "Evento de cambio de estado procesado exitosamente",
+  "message": "Estado actualizado exitosamente",
   "data": {
-    "id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+    "id": "5b13fb93-be82-11f0-b0de-f4b5205b5b70",
     "code": null,
-    "floatify_trip_id": "TEST_FLOW_20251107133238",
+    "floatify_trip_id": "TEST_FLOW_20251110161220",
     "customer_id": null,
-    "unit_id": "8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70",
-    "driver_id": "8b1b4b49-bc10-11f0-8bb1-f4b5205b5b70",
-    "substatus": null,
+    "unit_id": "5b12ee57-be82-11f0-b0de-f4b5205b5b70",
+    "driver_id": "5b138799-be82-11f0-b0de-f4b5205b5b70",
+    "substatus": "rumbo_a_zona_carga",
     "origin": null,
     "destination": null,
     "started_at": null,
     "completed_at": null,
-    "status": "pending",
+    "status": "en_ruta_carga",
     "qr_code": null,
     "qr_scanned_at": null,
     "trip_started_at": null,
     "trip_ended_at": null,
-    "whatsapp_group_id": "120363422139022976@g.us",
+    "whatsapp_group_id": "120363423255727761@g.us",
     "whatsapp_group_name": "Unidad Torton 309 41BB3T - 41BB3T",
     "cargo_description": null,
     "metadata": {
@@ -204,29 +171,34 @@ Base URL: http://localhost:8000/api/v1
       "planned_start": "2025-10-06T20:00:00-06:00",
       "planned_end": "2025-10-06T22:00:00-06:00"
     },
-    "created_at": "2025-11-07T13:32:48",
-    "updated_at": "2025-11-07T13:32:50"
+    "created_at": "2025-11-10T16:12:30",
+    "updated_at": "2025-11-10T16:12:54"
   }
 }
-[13:33:01] [SUCCESS] [OK] Request exitoso
-[13:33:04] [INFO] Verificando BD para trip_id: 8b1be776-bc10-11f0-8bb1-f4b5205b5b70
-[13:33:04] [INFO] Estado Esperado: en_ruta_carga -> rumbo_a_zona_carga
-[13:33:04] [INFO] [OK] Status Actual: en_ruta_carga
-[13:33:04] [INFO] [OK] Substatus Actual: rumbo_a_zona_carga
-[13:33:04] [INFO] 
+[16:12:55] [SUCCESS] [OK] Request exitoso
+[16:12:57] [WEBHOOK_CHECK] 
+────────────────────────────────────────────────────────────────────────────────
+[16:12:57] [WEBHOOK_CHECK] VERIFICANDO WEBHOOKS - FASE 2 - Inicio de Viaje
+[16:12:59] [WEBHOOK_STATS] Stats - Sent: 1, Failed: 0, Success: 100.0%
+[16:13:01] [WEBHOOK_LOG] Webhook: status_update - Status: sent - Retries: 0
+[16:13:04] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:13:04] [INFO] Estado Esperado: en_ruta_carga -> rumbo_a_zona_carga
+[16:13:04] [INFO] [OK] Status Actual: en_ruta_carga
+[16:13:04] [INFO] [OK] Substatus Actual: rumbo_a_zona_carga
+[16:13:04] [INFO] 
 ================================================================================
-[13:33:04] [INFO]                 FASE 3: EVENTO WIALON - LLEGADA A ZONA DE CARGA                 
-[13:33:04] [INFO] ================================================================================
+[16:13:04] [INFO]                 FASE 3: EVENTO WIALON - LLEGADA A ZONA DE CARGA                 
+[16:13:04] [INFO] ================================================================================
 
-[13:33:06] [REQUEST] 
+[16:13:06] [REQUEST] 
 [GET] /wialon/debug/trip/27538728
-[13:33:08] [RESPONSE] Status Code: 200
-[13:33:08] [RESPONSE] Response (JSON):
-[13:33:08] [DATA] {
+[16:13:08] [RESPONSE] Status Code: 200
+[16:13:08] [RESPONSE] Response (JSON):
+[16:13:08] [DATA] {
   "wialon_unit_id": "27538728",
   "unit_found": true,
   "unit": {
-    "id": "8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70",
+    "id": "5b12ee57-be82-11f0-b0de-f4b5205b5b70",
     "floatify_unit_id": "18",
     "wialon_unit_id": "27538728",
     "name": "Torton 309 41BB3T",
@@ -241,19 +213,19 @@ Base URL: http://localhost:8000/api/v1
       "wialon_id": "27538728",
       "imei": "863719067169228"
     },
-    "created_at": "2025-11-07T13:32:48",
-    "updated_at": "2025-11-07T13:32:50",
-    "whatsapp_group_id": "120363422139022976@g.us",
+    "created_at": "2025-11-10T16:12:30",
+    "updated_at": "2025-11-10T16:12:32",
+    "whatsapp_group_id": "120363423255727761@g.us",
     "whatsapp_group_name": "Unidad Torton 309 41BB3T - 41BB3T"
   },
   "trip_found": true,
   "trip": {
-    "id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+    "id": "5b13fb93-be82-11f0-b0de-f4b5205b5b70",
     "code": null,
-    "floatify_trip_id": "TEST_FLOW_20251107133238",
+    "floatify_trip_id": "TEST_FLOW_20251110161220",
     "customer_id": null,
-    "unit_id": "8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70",
-    "driver_id": "8b1b4b49-bc10-11f0-8bb1-f4b5205b5b70",
+    "unit_id": "5b12ee57-be82-11f0-b0de-f4b5205b5b70",
+    "driver_id": "5b138799-be82-11f0-b0de-f4b5205b5b70",
     "substatus": "rumbo_a_zona_carga",
     "origin": null,
     "destination": null,
@@ -264,7 +236,7 @@ Base URL: http://localhost:8000/api/v1
     "qr_scanned_at": null,
     "trip_started_at": null,
     "trip_ended_at": null,
-    "whatsapp_group_id": "120363422139022976@g.us",
+    "whatsapp_group_id": "120363423255727761@g.us",
     "whatsapp_group_name": "Unidad Torton 309 41BB3T - 41BB3T",
     "cargo_description": null,
     "metadata": {
@@ -275,66 +247,226 @@ Base URL: http://localhost:8000/api/v1
       "destination": "Jalisco",
       "tenant_id": 24,
       "planned_start": "2025-10-06T20:00:00-06:00",
-      "planned_end": "2025-10-06T22:00:00-06:00",
-      "last_status_change": {
-        "trigger": "qr_scan",
-        "timestamp": 1762543978,
-        "from_status": "asignado",
-        "to_status": "en_ruta_carga",
-        "metadata": {
-          "location": {
-            "lat": 21.0593683,
-            "lon": -101.7722416
-          }
-        }
-      },
-      "last_known_location": {
-        "lat": 21.0593683,
-        "lon": -101.7722416
-      },
-      "last_qr_scan": {
-        "timestamp": 1762543978,
-        "location": {
-          "lat": 21.0593683,
-          "lon": -101.7722416
-        },
-        "unit": {
-          "id": 18,
-          "name": "Torton 309 41BB3T",
-          "qr_token": "QR-ABC-123"
-        },
-        "driver": {
-          "id": 33,
-          "name": "PRUEBA_FLOWTIFY",
-          "phone": "+5214775589835"
-        }
-      }
+      "planned_end": "2025-10-06T22:00:00-06:00"
     },
-    "created_at": "2025-11-07T13:32:48",
-    "updated_at": "2025-11-07T13:33:00"
+    "created_at": "2025-11-10T16:12:30",
+    "updated_at": "2025-11-10T16:12:54"
   }
 }
-[13:33:08] [SUCCESS] [OK] Request exitoso
-[13:33:08] [REQUEST] 
+[16:13:08] [SUCCESS] [OK] Request exitoso
+[16:13:08] [REQUEST] 
 [POST] /wialon/events
-[13:33:08] [REQUEST] Payload (FORM):
-[13:33:08] [DATA] {'unit_name': 'Torton 309 41BB3T', 'unit_id': '27538728', 'imei': '863719067169228', 'latitude': 21.0505, 'longitude': -101.7995, 'altitude': 1796, 'speed': 6.2, 'course': 270, 'address': 'ZONA DE CARGA - PLANTA ACME, León, Gto., México', 'pos_time': '2024-10-07 01:28:20', 'driver_name': 'PRUEBA FLOWTIFY', 'driver_code': '29', 'geofence_name': 'PLANTA ACME - ZONA CARGA', 'geofence_id': '9001', 'notification_type': 'geofence_entry', 'notification_id': 'NOTIF_1762543988_8383', 'event_time': 1728280100}
-[13:33:11] [RESPONSE] Status Code: 200
-[13:33:11] [RESPONSE] Response (JSON):
-[13:33:11] [DATA] {
+[16:13:08] [REQUEST] Payload (FORM):
+[16:13:08] [DATA] {'unit_name': 'Torton 309 41BB3T', 'unit_id': '27538728', 'imei': '863719067169228', 'latitude': 21.0505, 'longitude': -101.7995, 'altitude': 1796, 'speed': 6.2, 'course': 270, 'address': 'ZONA DE CARGA - PLANTA ACME, León, Gto., México', 'pos_time': '2024-10-07 01:28:20', 'driver_name': 'PRUEBA FLOWTIFY', 'driver_code': '29', 'geofence_name': 'PLANTA ACME - ZONA CARGA', 'geofence_id': '9001', 'notification_type': 'geofence_entry', 'notification_id': 'NOTIF_1762812788_4739', 'event_time': 1728280100}
+[16:13:12] [RESPONSE] Status Code: 200
+[16:13:12] [RESPONSE] Response (JSON):
+[16:13:12] [DATA] {
   "success": true,
-  "event_id": "b1754f24-86ce-488d-92e0-103fe9713885",
-  "trip_id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+  "event_id": "23eef2dc-427a-491d-91a1-2f9c815ad3cd",
+  "trip_id": "5b13fb93-be82-11f0-b0de-f4b5205b5b70",
   "message": "Event processed successfully"
 }
-[13:33:11] [SUCCESS] [OK] Request exitoso
-[13:33:11] [USER_ACTION] >>> Evento de llegada a carga enviado.
+[16:13:12] [SUCCESS] [OK] Request exitoso
+[16:13:14] [WEBHOOK_CHECK] 
+────────────────────────────────────────────────────────────────────────────────
+[16:13:14] [WEBHOOK_CHECK] VERIFICANDO WEBHOOKS - FASE 3 - Llegada a Carga (Geofence Entry)
+[16:13:16] [WEBHOOK_STATS] Stats - Sent: 1, Failed: 0, Success: 100.0%
+[16:13:18] [WEBHOOK_LOG] Webhook: status_update - Status: sent - Retries: 0
+[16:13:20] [USER_ACTION] >>> Evento de llegada a carga enviado.
   - Revisa WhatsApp
   - Deberías recibir un mensaje del bot preguntando si iniciaste la carga
   - Algo como: 'Llegaste a PLANTA ACME - ZONA CARGA. Ya iniciaste la carga?'
-[13:33:11] [PAUSE] Esperando acción del usuario...
-[13:37:03] [INTERRUPT] Test interrumpido por el usuario (Ctrl+C)
+[16:13:20] [PAUSE] Esperando acción del usuario...
+[16:13:25] [RESUME] Usuario confirmó. Continuando...
+[16:13:26] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:13:26] [INFO] Estado Esperado: en_zona_carga -> esperando_inicio_carga
+[16:13:26] [INFO] [OK] Status Actual: en_zona_carga
+[16:13:26] [INFO] [OK] Substatus Actual: esperando_inicio_carga
+[16:13:26] [INFO] 
+================================================================================
+[16:13:26] [INFO]               FASE 4: INTERACCIÓN DEL CONDUCTOR (Proceso de Carga)              
+[16:13:26] [INFO] ================================================================================
+
+[16:13:26] [USER_ACTION] >>> [USER_ACTION] Enviar mensaje: 'esperando en el anden'
+[16:13:41] [INFO] [INTERACTION] Usuario envió: 'esperando en el anden'
+[16:13:41] [INFO] [INTERACTION] Bot respondió: 'Entendido, sigues esperando en el andén. Te mantendré informado si hay algún cambio de estatus. ¡Gracias por avisar!'
+[16:13:42] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:13:42] [INFO] Estado Esperado: en_zona_carga -> esperando_turno
+[16:13:42] [INFO] [OK] Status Actual: en_zona_carga
+[16:13:42] [ERROR] [FALLA] Substatus Actual: esperando_inicio_carga (Esperado: esperando_turno)
+[16:13:42] [USER_ACTION] >>> [USER_ACTION] Enviar mensaje: 'ya empece a cargar'
+[16:13:58] [INFO] [INTERACTION] Usuario envió: 'ya empece a cargar'
+[16:13:58] [INFO] [INTERACTION] Bot respondió: '¡Excelente! Me da gusto saber que ya iniciaste la carga. Por favor, avísame cuando termines para proceder con la siguiente indicación.'
+[16:13:59] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:13:59] [INFO] Estado Esperado: en_zona_carga -> cargando
+[16:13:59] [INFO] [OK] Status Actual: en_zona_carga
+[16:13:59] [ERROR] [FALLA] Substatus Actual: loading_in_progress (Esperado: cargando)
+[16:13:59] [USER_ACTION] >>> [USER_ACTION] Enviar mensaje: 'ya termine la carga'
+[16:14:40] [INFO] [INTERACTION] Usuario envió: 'ya termine la carga'
+[16:14:40] [INFO] [INTERACTION] Bot respondió: '¡Excelente! Ya confirmamos que la carga ha finalizado. Por favor, procede a la siguiente instrucción o confirma si ya te estás retirando del muelle.'
+[16:14:41] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:14:41] [INFO] Estado Esperado: en_zona_carga -> carga_completada
+[16:14:41] [INFO] [OK] Status Actual: en_zona_carga
+[16:14:41] [ERROR] [FALLA] Substatus Actual: waiting_departure (Esperado: carga_completada)
+[16:14:43] [INFO] 
+================================================================================
+[16:14:43] [INFO] MESSAGING CHECK - Trip: 5b13fb93-be82-11f0-b0de-f4b5205b5b70, Group: 120363423255727761@g.us
+[16:14:43] [INFO] ================================================================================
+[16:14:43] [INFO] [UNIT] ID: 5b12ee57-be82-11f0-b0de-f4b5205b5b70, Name: Torton 309 41BB3T
+[16:14:43] [INFO] [UNIT] WhatsApp Group ID: 120363423255727761@g.us
+[16:14:43] [INFO] [UNIT] WhatsApp Group Name: Unidad Torton 309 41BB3T - 41BB3T
+[16:14:43] [INFO] [CONVERSATION] ID: 5c18f11b-be82-11f0-b0de-f4b5205b5b70, Status: active
+[16:14:43] [INFO] [CONVERSATION] Group ID: 120363423255727761@g.us
+[16:14:43] [INFO] [MESSAGES] Total: 3
+[16:14:43] [INFO] [MESSAGES] Inbound: 3, Outbound: 0
+[16:14:43] [INFO] [MESSAGE] ← [driver] ya termine la carga
+[16:14:43] [INFO] [MESSAGE] ← [driver] ya ando acargand
+[16:14:43] [INFO] [MESSAGE] ← [driver] estoy esperando en el anden
+[16:14:43] [INFO] [AI_INTERACTIONS] Total: 3
+[16:14:43] [INFO] ================================================================================
+
+[16:14:43] [INFO] 
+================================================================================
+[16:14:43] [INFO]                 FASE 5: EVENTO WIALON - SALIDA DE ZONA DE CARGA                 
+[16:14:43] [INFO] ================================================================================
+
+[16:14:43] [REQUEST] 
+[POST] /wialon/events
+[16:14:43] [REQUEST] Payload (FORM):
+[16:14:43] [DATA] {'unit_name': 'Torton 309 41BB3T', 'unit_id': '27538728', 'imei': '863719067169228', 'latitude': 21.051, 'longitude': -101.799, 'altitude': 1796, 'speed': 8.4, 'course': 90, 'address': 'ZONA DE CARGA - PLANTA ACME, León, Gto., México', 'pos_time': '2024-10-07 01:33:20', 'driver_name': 'PRUEBA FLOWTIFY', 'driver_code': '29', 'geofence_name': 'PLANTA ACME - ZONA CARGA', 'geofence_id': '9001', 'notification_type': 'geofence_exit', 'notification_id': 'NOTIF_1762812883_7973', 'event_time': 1728280400}
+[16:14:45] [RESPONSE] Status Code: 200
+[16:14:45] [RESPONSE] Response (JSON):
+[16:14:45] [DATA] {
+  "success": true,
+  "event_id": "586073af-0966-42f9-871f-2ddd5c3e9ebb",
+  "trip_id": "5b13fb93-be82-11f0-b0de-f4b5205b5b70",
+  "message": "Event processed successfully"
+}
+[16:14:45] [SUCCESS] [OK] Request exitoso
+[16:14:47] [WEBHOOK_CHECK] 
+────────────────────────────────────────────────────────────────────────────────
+[16:14:47] [WEBHOOK_CHECK] VERIFICANDO WEBHOOKS - FASE 5 - Salida de Carga (Geofence Exit)
+[16:14:49] [WEBHOOK_STATS] Stats - Sent: 4, Failed: 0, Success: 100.0%
+[16:14:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:14:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:14:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:14:51] [WEBHOOK_LOG] Webhook: status_update - Status: sent - Retries: 0
+[16:14:54] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:14:54] [INFO] Estado Esperado: en_ruta_destino -> rumbo_a_descarga
+[16:14:54] [INFO] [OK] Status Actual: en_ruta_destino
+[16:14:54] [INFO] [OK] Substatus Actual: rumbo_a_descarga
+[16:14:54] [INFO] 
+================================================================================
+[16:14:54] [INFO]                FASE 6: EVENTO WIALON - LLEGADA A ZONA DE DESCARGA               
+[16:14:54] [INFO] ================================================================================
+
+[16:14:54] [REQUEST] 
+[POST] /wialon/events
+[16:14:54] [REQUEST] Payload (FORM):
+[16:14:54] [DATA] {'unit_name': 'Torton 309 41BB3T', 'unit_id': '27538728', 'imei': '863719067169228', 'latitude': 20.6736, 'longitude': -103.3444, 'altitude': 1566, 'speed': 5.5, 'course': 180, 'address': 'BODEGA COPPEL JALISCO, Jalisco, México', 'pos_time': '2024-10-07 03:15:30', 'driver_name': 'PRUEBA FLOWTIFY', 'driver_code': '29', 'geofence_name': 'BODEGA COPPEL JALISCO', 'geofence_id': '9002', 'notification_type': 'geofence_entry', 'notification_id': 'NOTIF_1762812894_3445', 'event_time': 1728286530}
+[16:14:58] [RESPONSE] Status Code: 200
+[16:14:58] [RESPONSE] Response (JSON):
+[16:14:58] [DATA] {
+  "success": true,
+  "event_id": "75156b61-2a69-4999-82ea-fd1cc23fd8ef",
+  "trip_id": "5b13fb93-be82-11f0-b0de-f4b5205b5b70",
+  "message": "Event processed successfully"
+}
+[16:14:58] [SUCCESS] [OK] Request exitoso
+[16:15:00] [WEBHOOK_CHECK] 
+────────────────────────────────────────────────────────────────────────────────
+[16:15:00] [WEBHOOK_CHECK] VERIFICANDO WEBHOOKS - FASE 6 - Llegada a Descarga (Geofence Entry)
+[16:15:02] [WEBHOOK_STATS] Stats - Sent: 3, Failed: 0, Success: 100.0%
+[16:15:04] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:04] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:04] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:04] [WEBHOOK_LOG] Webhook: status_update - Status: sent - Retries: 0
+[16:15:06] [USER_ACTION] >>> Evento de llegada a descarga enviado.
+  - Revisa WhatsApp
+  - Deberías recibir mensaje del bot pidiendo confirmación
+  - Algo como: 'Llegaste a BODEGA COPPEL JALISCO. Confirma cuando inicies descarga.'
+[16:15:06] [PAUSE] Esperando acción del usuario...
+[16:15:12] [RESUME] Usuario confirmó. Continuando...
+[16:15:13] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:15:13] [INFO] Estado Esperado: en_zona_descarga -> esperando_inicio_descarga
+[16:15:13] [INFO] [OK] Status Actual: en_zona_descarga
+[16:15:13] [INFO] [OK] Substatus Actual: esperando_inicio_descarga
+[16:15:13] [INFO] 
+================================================================================
+[16:15:13] [INFO]               FASE 7: INTERACCIÓN DEL CONDUCTOR (Cierre de Viaje)               
+[16:15:13] [INFO] ================================================================================
+
+[16:15:13] [USER_ACTION] >>> [USER_ACTION] Enviar mensaje: 'ya empece a descargar'
+[16:15:26] [INFO] [INTERACTION] Usuario envió: 'ya empece a descargar'
+[16:15:26] [INFO] [INTERACTION] Bot respondió: '¡Excelente! Gracias por avisar que ya iniciaste la descarga. Mantente seguro.'
+[16:15:27] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:15:27] [INFO] Estado Esperado: en_zona_descarga -> descargando
+[16:15:27] [INFO] [OK] Status Actual: en_zona_descarga
+[16:15:27] [INFO] [OK] Substatus Actual: descargando
+[16:15:27] [USER_ACTION] >>> [USER_ACTION] Enviar mensaje: 'ya termine de descargar me voy'
+[16:15:44] [INFO] [INTERACTION] Usuario envió: 'ya termine de descargar me voy'
+[16:15:44] [INFO] [INTERACTION] Bot respondió: '¡Entendido! Ya terminaste la descarga y te vas. Confirmo que la operación en zona de descarga ha finalizado. ¡Buen camino!'
+[16:15:45] [INFO] Verificando BD para trip_id: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:15:45] [INFO] Estado Esperado: finalizado -> descarga_completada
+[16:15:45] [INFO] [OK] Status Actual: finalizado
+[16:15:45] [INFO] [OK] Substatus Actual: descarga_completada
+[16:15:47] [INFO] 
+================================================================================
+[16:15:47] [INFO] MESSAGING CHECK - Trip: 5b13fb93-be82-11f0-b0de-f4b5205b5b70, Group: 120363423255727761@g.us
+[16:15:47] [INFO] ================================================================================
+[16:15:47] [INFO] [UNIT] ID: 5b12ee57-be82-11f0-b0de-f4b5205b5b70, Name: Torton 309 41BB3T
+[16:15:47] [INFO] [UNIT] WhatsApp Group ID: 120363423255727761@g.us
+[16:15:47] [INFO] [UNIT] WhatsApp Group Name: Unidad Torton 309 41BB3T - 41BB3T
+[16:15:47] [INFO] [CONVERSATION] ID: 5c18f11b-be82-11f0-b0de-f4b5205b5b70, Status: active
+[16:15:47] [INFO] [CONVERSATION] Group ID: 120363423255727761@g.us
+[16:15:47] [INFO] [MESSAGES] Total: 5
+[16:15:47] [INFO] [MESSAGES] Inbound: 5, Outbound: 0
+[16:15:47] [INFO] [MESSAGE] ← [driver] ya termine me voy
+[16:15:47] [INFO] [MESSAGE] ← [driver] ya empece a descargar
+[16:15:47] [INFO] [MESSAGE] ← [driver] ya termine la carga
+[16:15:47] [INFO] [AI_INTERACTIONS] Total: 5
+[16:15:47] [INFO] ================================================================================
+
+[16:15:47] [INFO] 
+********************************************************************************
+[16:15:47] [INFO]                          FASE 8: PRUEBA E2E COMPLETADA                          
+[16:15:47] [INFO] ********************************************************************************
+
+[16:15:47] [SUCCESS] ¡FLUJO E2E COMPLETADO EXITOSAMENTE!
+[16:15:47] [SUMMARY] 
+RESUMEN DEL VIAJE:
+[16:15:47] [SUMMARY]   Código de Viaje: TEST_FLOW_20251110161220
+[16:15:47] [SUMMARY]   Trip ID: 5b13fb93-be82-11f0-b0de-f4b5205b5b70
+[16:15:47] [SUMMARY]   Estado Final: finalizado
+[16:15:47] [WEBHOOK_CHECK] 
+────────────────────────────────────────────────────────────────────────────────
+[16:15:47] [WEBHOOK_CHECK] VERIFICANDO WEBHOOKS - RESUMEN FINAL
+[16:15:49] [WEBHOOK_STATS] Stats - Sent: 5, Failed: 0, Success: 100.0%
+[16:15:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:51] [WEBHOOK_LOG] Webhook: communication_response - Status: sent - Retries: 0
+[16:15:51] [WEBHOOK_LOG] Webhook: status_update - Status: sent - Retries: 0
+[16:15:57] [USER_INPUT] Usuario respondió sobre limpieza: s
+[16:15:57] [CLEANUP] Iniciando limpieza de grupo
+[16:15:57] [REQUEST] 
+[POST] /trips/5b13fb93-be82-11f0-b0de-f4b5205b5b70/cleanup_group
+[16:15:59] [RESPONSE] Status Code: 400
+[16:15:59] [RESPONSE] Response (JSON):
+[16:15:59] [DATA] {
+  "detail": {
+    "success": false,
+    "error": {
+      "code": "BUSINESS_LOGIC_ERROR",
+      "message": "No se puede abandonar este grupo de WhatsApp porque está vinculado a la unidad y es compartido por múltiples viajes. Para abandonar el grupo, debe eliminarse primero de la tabla units.",
+      "context": {}
+    }
+  }
+}
+[16:15:59] [WARNING] ⚠ Request con status 400
+[16:15:59] [WARNING] Falló la limpieza del grupo: {"detail": {"success": false, "error": {"code": "BUSINESS_LOGIC_ERROR", "message": "No se puede abandonar este grupo de WhatsApp porque est\u00e1 vinculado a la unidad y es compartido por m\u00faltiples viajes. Para abandonar el grupo, debe eliminarse primero de la tabla units.", "context": {}}}}
 
 ================================================================================
-Log finalizado: 2025-11-07 13:37:03
+Log finalizado: 2025-11-10 16:15:59
 ================================================================================

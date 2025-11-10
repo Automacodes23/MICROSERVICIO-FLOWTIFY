@@ -48,12 +48,12 @@ class Settings(BaseSettings):
     db_pool_timeout: float = 10.0
 
     # Evolution API (WhatsApp)
-    evolution_api_url: str
-    evolution_api_key: str
+    evolution_api_url: str = ""  # Opcional para testing
+    evolution_api_key: str = ""  # Opcional para testing
     evolution_instance_name: str = "SATECH"
 
     # Gemini AI
-    gemini_api_key: str
+    gemini_api_key: str = ""  # Opcional para testing
     gemini_model: str = "gemini-2.5-flash"
 
     # Floatify
@@ -77,8 +77,52 @@ class Settings(BaseSettings):
     retry_initial_delay: float = 1.0
     retry_max_delay: float = 10.0
 
+    # Flowtify Webhook Integration
+    flowtify_webhook_url: Optional[str] = None
+    webhook_retry_max: int = 5
+    webhook_timeout: int = 30
+    webhook_circuit_breaker_threshold: int = 5
+    webhook_circuit_breaker_timeout: int = 60
+    webhooks_enabled: bool = True
+    webhooks_enabled_tenants: str = "24"  # Comma-separated tenant IDs
+
     # Sentry (opcional)
     sentry_dsn: Optional[str] = None
+    
+    @property
+    def webhook_enabled_tenant_list(self) -> list[int]:
+        """
+        Convertir string de tenants a lista de enteros
+        
+        Returns:
+            Lista de tenant IDs habilitados para webhooks
+        """
+        if not self.webhooks_enabled_tenants:
+            return []
+        try:
+            return [int(t.strip()) for t in self.webhooks_enabled_tenants.split(",") if t.strip()]
+        except ValueError:
+            return []
+    
+    def is_webhook_enabled_for_tenant(self, tenant_id: int) -> bool:
+        """
+        Verificar si webhooks están habilitados para un tenant específico
+        
+        Args:
+            tenant_id: ID del tenant a verificar
+            
+        Returns:
+            True si webhooks están habilitados para este tenant
+        """
+        if not self.webhooks_enabled:
+            return False
+        
+        enabled_tenants = self.webhook_enabled_tenant_list
+        # Si la lista está vacía, habilitar para todos
+        if not enabled_tenants:
+            return True
+        
+        return tenant_id in enabled_tenants
 
     @property
     def database_url(self) -> str:

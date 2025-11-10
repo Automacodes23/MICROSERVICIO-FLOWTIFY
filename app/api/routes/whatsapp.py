@@ -54,8 +54,21 @@ async def receive_whatsapp_message(
                 # Obtener group_id del mensaje original
                 group_id = message.data.key.get("remoteJid")
                 if group_id:
+                    # Obtener trip_id del contexto del mensaje (si existe)
+                    trip_id = None
+                    if result.get("conversation_id"):
+                        # Buscar trip_id de la conversación
+                        from app.repositories.message_repository import ConversationRepository
+                        conv_repo = ConversationRepository(message_service.db)
+                        conv = await conv_repo.find_by_id(result["conversation_id"])
+                        if conv:
+                            trip_id = conv.get("trip_id")
+                    
                     await notification_service.send_notification_to_group(
-                        group_id, response_text
+                        group_id=group_id,
+                        message=response_text,
+                        trip_id=trip_id,
+                        ai_result=ai_result,
                     )
 
         return MessageProcessedResponse(

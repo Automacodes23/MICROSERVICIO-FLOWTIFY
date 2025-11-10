@@ -112,6 +112,188 @@ def close_log():
 
 
 # =============================================================================
+# FUNCIONES HELPER - WEBHOOK MONITORING (NUEVO)
+# =============================================================================
+
+def check_geofence_webhooks_detailed():
+    """Verificación detallada SOLO de webhooks de geofence"""
+    try:
+        print(f"\n{Colors.BOLD}🔍 BÚSQUEDA ESPECÍFICA DE WEBHOOKS DE GEOFENCE:{Colors.ENDC}")
+        
+        # Buscar SOLO geofence_transition
+        response = requests.get(
+            f"{BASE_URL}/webhooks/delivery-log",
+            params={"webhook_type": "geofence_transition", "limit": 20},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            count = data.get('count', 0)
+            
+            if count > 0:
+                print(f"{Colors.OKGREEN}✓ Encontrados {count} webhooks de geofence_transition{Colors.ENDC}")
+                for log in data.get('logs', []):
+                    payload = json.loads(log['payload']) if isinstance(log['payload'], str) else log['payload']
+                    geo_data = payload.get('geofence', {})
+                    print(f"  - {geo_data.get('name')} ({payload.get('transition_type')}) - {log['status']}")
+                    log_to_file(f"Geofence webhook: {geo_data.get('name')} - {log['status']}", "GEOFENCE_WEBHOOK")
+            else:
+                print(f"{Colors.FAIL}✗ NO se encontraron webhooks de geofence_transition{Colors.ENDC}")
+                print(f"{Colors.WARNING}  Esto indica que EventService.webhook_service probablemente es None{Colors.ENDC}")
+                log_to_file("NO HAY webhooks de geofence_transition en la BD", "CRITICAL")
+        
+    except Exception as e:
+        print(f"{Colors.WARNING}⚠ Error al buscar geofence webhooks: {e}{Colors.ENDC}")
+
+
+def check_webhooks_sent(trip_id=None, fase_name="", expect_geofence=False):
+    """
+    Verifica los webhooks que se enviaron a Flowtify
+    
+    Args:
+        trip_id: ID del viaje (opcional, para filtrar)
+        fase_name: Nombre de la fase actual para contexto
+        expect_geofence: Si True, alerta si NO hay webhooks de geofence
+    """
+    print(f"\n{Colors.OKCYAN}{'─'*80}")
+    print(f"📡 VERIFICANDO WEBHOOKS ENVIADOS A FLOWTIFY {f'(Fase: {fase_name})' if fase_name else ''}")
+    print(f"{'─'*80}{Colors.ENDC}")
+    
+    log_to_file(f"\n{'─'*80}", "WEBHOOK_CHECK")
+    log_to_file(f"VERIFICANDO WEBHOOKS - {fase_name}", "WEBHOOK_CHECK")
+    
+    # Variables para tracking
+    webhook_types_found = set()
+    
+    try:
+        # 1. Obtener estadísticas generales
+        stats_response = requests.get(f"{BASE_URL}/webhooks/stats", timeout=5)
+        
+        if stats_response.status_code == 200:
+            stats = stats_response.json()
+            
+            print(f"\n📊 {Colors.BOLD}Estadísticas Generales:{Colors.ENDC}")
+            print(f"   Total enviados: {Colors.OKGREEN}{stats['total_sent']}{Colors.ENDC}")
+            print(f"   Total fallidos: {Colors.FAIL if stats['total_failed'] > 0 else Colors.OKGREEN}{stats['total_failed']}{Colors.ENDC}")
+            print(f"   Success rate: {Colors.OKGREEN}{stats['success_rate']}%{Colors.ENDC}")
+            print(f"   Pending retries: {stats['pending_retries']}")
+            print(f"   DLQ size: {Colors.FAIL if stats['dlq_size'] > 0 else Colors.OKGREEN}{stats['dlq_size']}{Colors.ENDC}")
+            
+            log_to_file(f"Stats - Sent: {stats['total_sent']}, Failed: {stats['total_failed']}, Success: {stats['success_rate']}%", "WEBHOOK_STATS")
+        
+        # 2. Obtener logs de delivery (últimos 10 o filtrados por trip)
+        params = {"limit": 10}
+        if trip_id:
+            params["trip_id"] = trip_id
+        
+        logs_response = requests.get(f"{BASE_URL}/webhooks/delivery-log", params=params, timeout=5)
+        
+        if logs_response.status_code == 200:
+            logs_data = logs_response.json()
+            logs = logs_data.get("logs", [])
+            
+            if logs:
+                print(f"\n📋 {Colors.BOLD}Webhooks Enviados{' para este viaje' if trip_id else ' (últimos 10)'}{Colors.ENDC}:")
+                
+                for log in logs:
+                    webhook_type = log['webhook_type']
+                    status = log['status']
+                    retry_count = log['retry_count']
+                    created_at = log['created_at']
+                    
+                    # Track tipos de webhooks encontrados
+                    webhook_types_found.add(webhook_type)
+                    
+                    # Icono según status
+                    if status == 'sent':
+                        icon = f"{Colors.OKGREEN}✓{Colors.ENDC}"
+                        status_text = f"{Colors.OKGREEN}{status}{Colors.ENDC}"
+                    elif status == 'failed':
+                        icon = f"{Colors.FAIL}✗{Colors.ENDC}"
+                        status_text = f"{Colors.FAIL}{status}{Colors.ENDC}"
+                    else:
+                        icon = f"{Colors.WARNING}◯{Colors.ENDC}"
+                        status_text = f"{Colors.WARNING}{status}{Colors.ENDC}"
+                    
+                    print(f"   {icon} {Colors.BOLD}{webhook_type}{Colors.ENDC}")
+                    print(f"      Status: {status_text}")
+                    print(f"      Created: {created_at}")
+                    print(f"      Retries: {retry_count}")
+                    
+                    # Si falló, mostrar error
+                    if status == 'failed' and log.get('last_error'):
+                        print(f"      {Colors.FAIL}Error: {log['last_error'][:100]}{Colors.ENDC}")
+                    
+                    # Mostrar payload resumido
+                    try:
+                        payload = json.loads(log['payload']) if isinstance(log['payload'], str) else log['payload']
+                        print(f"      Event: {payload.get('event', 'N/A')}")
+                        
+                        # Mostrar target URL
+                        target_url = log.get('target_url', 'N/A')
+                        print(f"      Target: {target_url}")
+                    except:
+                        pass
+                    
+                    print()
+                    
+                    log_to_file(f"Webhook: {webhook_type} - Status: {status} - Retries: {retry_count}", "WEBHOOK_LOG")
+            else:
+                print(f"\n{Colors.WARNING}⚠ No se encontraron webhooks{' para este viaje' if trip_id else ''}{Colors.ENDC}")
+                log_to_file("No se encontraron webhooks", "WEBHOOK_CHECK")
+        else:
+            print(f"\n{Colors.WARNING}⚠ No se pudieron obtener logs de webhooks (Status: {logs_response.status_code}){Colors.ENDC}")
+            log_to_file(f"Error al obtener logs de webhooks: {logs_response.status_code}", "WARNING")
+        
+        # 3. Verificar DLQ
+        dlq_response = requests.get(f"{BASE_URL}/webhooks/dead-letter-queue", timeout=5)
+        
+        if dlq_response.status_code == 200:
+            dlq_data = dlq_response.json()
+            dlq_items = dlq_data.get("items", [])
+            
+            if dlq_items:
+                print(f"\n{Colors.FAIL}⚠ ATENCIÓN: {len(dlq_items)} webhooks en Dead Letter Queue{Colors.ENDC}")
+                for item in dlq_items[:5]:  # Mostrar máximo 5
+                    print(f"   - {item['webhook_type']}: {item['failure_reason'][:80]}")
+                log_to_file(f"DLQ tiene {len(dlq_items)} items", "WARNING")
+        
+        # ALERTA si se esperaba geofence pero no se encontró
+        if expect_geofence and 'geofence_transition' not in webhook_types_found:
+            print(f"\n{Colors.FAIL}{'='*80}")
+            print(f"⚠️  ALERTA CRÍTICA: WEBHOOK DE GEOFENCE NO GENERADO")
+            print(f"{'='*80}{Colors.ENDC}")
+            print(f"{Colors.WARNING}Se esperaba un webhook de tipo 'geofence_transition' pero NO se encontró.{Colors.ENDC}")
+            print(f"{Colors.WARNING}Tipos encontrados: {', '.join(webhook_types_found) if webhook_types_found else 'Ninguno'}{Colors.ENDC}")
+            print(f"\n{Colors.BOLD}Causas posibles:{Colors.ENDC}")
+            print(f"  1. EventService.webhook_service es None (no se inyectó correctamente)")
+            print(f"  2. El código en EventService._send_webhooks_for_event() no se ejecuta")
+            print(f"  3. Error silencioso al enviar el webhook de geofence")
+            print(f"\n{Colors.BOLD}Solución:{Colors.ENDC}")
+            print(f"  - Revisa los logs del servidor en busca de:")
+            print(f"    * 'event_service_initialized' → ¿has_webhook_service es True?")
+            print(f"    * 'whatsapp_notification_check' → se ejecuta al procesar geofence")
+            print(f"    * 'event_webhook_check' → intenta enviar webhook")
+            print(f"{Colors.FAIL}{'='*80}{Colors.ENDC}\n")
+            
+            log_to_file("ALERTA: Webhook de geofence NO generado cuando se esperaba", "CRITICAL")
+            log_to_file(f"Tipos encontrados: {webhook_types_found}", "INFO")
+        
+        print(f"\n{Colors.OKCYAN}{'─'*80}{Colors.ENDC}\n")
+        
+    except requests.exceptions.Timeout:
+        print(f"\n{Colors.WARNING}⚠ Timeout al verificar webhooks (endpoint puede no estar disponible){Colors.ENDC}\n")
+        log_to_file("Timeout al verificar webhooks", "WARNING")
+    except requests.exceptions.ConnectionError:
+        print(f"\n{Colors.WARNING}⚠ No se pudo conectar al endpoint de webhooks{Colors.ENDC}\n")
+        log_to_file("Error de conexión al verificar webhooks", "WARNING")
+    except Exception as e:
+        print(f"\n{Colors.WARNING}⚠ Error al verificar webhooks: {e}{Colors.ENDC}\n")
+        log_to_file(f"Error al verificar webhooks: {e}", "ERROR")
+
+
+# =============================================================================
 # FUNCIONES HELPER - UI
 # =============================================================================
 
@@ -856,6 +1038,9 @@ def fase_2_iniciar_viaje(trip_id):
     print(f"  Subestado: {Colors.BOLD}rumbo_a_zona_carga{Colors.ENDC}")
     
     time.sleep(2)  # Pequeña pausa para simular tiempo real
+    
+    # NUEVO: Verificar webhooks enviados
+    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 2 - Inicio de Viaje")
 
 
 # =============================================================================
@@ -921,6 +1106,13 @@ def fase_3_llegada_carga():
     
     print(f"\n{Colors.OKGREEN}[OK] Llegada a zona de carga simulada{Colors.ENDC}")
     
+    # NUEVO: Verificar webhooks de geofence transition
+    time.sleep(2)  # Esperar a que webhook se procese
+    check_webhooks_sent(fase_name="FASE 3 - Llegada a Carga (Geofence Entry)", expect_geofence=True)
+    
+    # BÚSQUEDA ESPECÍFICA de geofence webhooks
+    check_geofence_webhooks_detailed()
+    
     wait_for_user(
         f"Evento de llegada a carga enviado.\n"
         f"  - Revisa WhatsApp\n"
@@ -960,6 +1152,9 @@ def fase_4_interaccion_carga(trip_id, group_id):
     
     # Verificar estado de mensajería después de la interacción
     check_messaging_db_status(trip_id, group_id, delay=2.0)
+    
+    # NUEVO: Verificar webhooks de communication_response
+    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 4 - Comunicación WhatsApp")
 
 
 # =============================================================================
@@ -1008,6 +1203,12 @@ def fase_5_salida_carga():
     print(f"  Estado esperado: {Colors.BOLD}en_ruta_destino{Colors.ENDC}")
     
     time.sleep(2)
+    
+    # NUEVO: Verificar webhooks de geofence exit
+    check_webhooks_sent(fase_name="FASE 5 - Salida de Carga (Geofence Exit)", expect_geofence=True)
+    
+    # BÚSQUEDA ESPECÍFICA de geofence webhooks
+    check_geofence_webhooks_detailed()
 
 
 # =============================================================================
@@ -1054,6 +1255,13 @@ def fase_6_llegada_descarga():
     
     print(f"\n{Colors.OKGREEN}[OK] Llegada a zona de descarga simulada{Colors.ENDC}")
     
+    # NUEVO: Verificar webhooks de geofence entry
+    time.sleep(2)
+    check_webhooks_sent(fase_name="FASE 6 - Llegada a Descarga (Geofence Entry)", expect_geofence=True)
+    
+    # BÚSQUEDA ESPECÍFICA de geofence webhooks
+    check_geofence_webhooks_detailed()
+    
     wait_for_user(
         f"Evento de llegada a descarga enviado.\n"
         f"  - Revisa WhatsApp\n"
@@ -1090,6 +1298,9 @@ def fase_7_interaccion_cierre():
         f"  - Has recibido confirmación del bot de que el viaje terminó\n"
         f"  - El mensaje del bot debería decir algo como 'Viaje finalizado'"
     )
+    
+    # NUEVO: Verificar webhooks de communication_response
+    check_webhooks_sent(fase_name="FASE 7 - Finalización WhatsApp")
 
 
 # =============================================================================
@@ -1130,6 +1341,12 @@ def fase_8_finalizacion(trip_id, trip_code):
     print(f"  4. Revisar eventos procesados:")
     print(f"     {Colors.OKCYAN}SELECT * FROM events WHERE trip_id = {trip_id} ORDER BY created_at;{Colors.ENDC}")
     print()
+    
+    # NUEVO: Resumen completo de webhooks del viaje
+    print(f"\n{Colors.OKBLUE}{'='*80}")
+    print(f"RESUMEN COMPLETO DE WEBHOOKS - TODO EL VIAJE")
+    print(f"{'='*80}{Colors.ENDC}\n")
+    check_webhooks_sent(trip_id=trip_id, fase_name="RESUMEN FINAL")
     
     # ¡NUEVA SECCIÓN DE LIMPIEZA!
     print(f"\n{Colors.OKBLUE}{'='*80}")
@@ -1215,7 +1432,26 @@ def main():
     # Verificar servidor
     check_server()
     
-    # Verificar configuración de webhook
+    # NUEVO: Verificar sistema de webhooks Flowtify
+    print(f"\n{Colors.BOLD}[CHECK] Verificando sistema de webhooks Flowtify...{Colors.ENDC}")
+    try:
+        webhook_health = requests.get(f"{BASE_URL}/webhooks/health", timeout=5).json()
+        print(f"   Status: {Colors.OKGREEN}{webhook_health.get('status')}{Colors.ENDC}")
+        print(f"   URL configurada: {'✓' if webhook_health.get('has_target_url') else '✗'}")
+        print(f"   Secret configurado: {'✓' if webhook_health.get('has_secret') else '✗'}")
+        print(f"   Circuit Breaker: {webhook_health.get('circuit_breaker_state')}")
+        
+        if webhook_health.get('status') != 'healthy':
+            print(f"\n{Colors.WARNING}⚠ NOTA: Webhooks a Flowtify NO están completamente configurados{Colors.ENDC}")
+            print(f"   Los webhooks NO se enviarán a Flowtify, pero el script funcionará.")
+            print(f"   Para habilitar: configura FLOWTIFY_WEBHOOK_URL en .env")
+        else:
+            print(f"\n{Colors.OKGREEN}✓ Webhooks a Flowtify están activos y funcionando{Colors.ENDC}")
+            print(f"   Los eventos se enviarán automáticamente a Flowtify")
+    except:
+        print(f"{Colors.WARNING}⚠ No se pudo verificar webhooks (endpoint puede no estar disponible){Colors.ENDC}")
+    
+    # Verificar configuración de webhook Evolution API
     check_webhook_config()
     
     print(f"\n{Colors.OKCYAN}Código único de viaje para este test: {Colors.BOLD}{TRIP_CODE}{Colors.ENDC}\n")

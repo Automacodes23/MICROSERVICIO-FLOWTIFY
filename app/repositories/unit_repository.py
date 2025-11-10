@@ -29,7 +29,13 @@ class UnitRepository(BaseRepository):
         return dict(row) if row else None
 
     async def upsert(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Crear o actualizar una unidad por floatify_unit_id"""
+        """
+        Crear o actualizar una unidad por floatify_unit_id
+        
+        IMPORTANTE: Este método preserva whatsapp_group_id y whatsapp_group_name
+        si ya existen en la BD. Estos campos solo deben actualizarse mediante
+        el método update() o cuando se crea/reutiliza un grupo de WhatsApp.
+        """
         # Extraer campos del metadata si existen
         floatify_unit_id = data.get("floatify_unit_id") or data.get("metadata", {}).get("floatify_unit_id")
         wialon_unit_id = data.get("wialon_id") or data.get("wialon_unit_id")
@@ -40,6 +46,8 @@ class UnitRepository(BaseRepository):
         # MySQL usa ON DUPLICATE KEY UPDATE en lugar de ON CONFLICT
         # Usar la misma conexión para INSERT y SELECT
         async with self.db.acquire() as (cursor, conn):
+            # CRÍTICO: NO actualizamos whatsapp_group_id ni whatsapp_group_name
+            # para preservar el grupo existente de la unidad
             insert_query = """
                 INSERT INTO units (floatify_unit_id, wialon_unit_id, name, plate, metadata)
                 VALUES (%s, %s, %s, %s, %s)
@@ -49,11 +57,18 @@ class UnitRepository(BaseRepository):
                     plate = VALUES(plate),
                     metadata = VALUES(metadata),
                     updated_at = NOW()
+                    -- whatsapp_group_id y whatsapp_group_name se preservan intencionalmente
             """
             
             # Ejecutar INSERT
             await cursor.execute(insert_query, (floatify_unit_id, wialon_unit_id, name, plate, json.dumps(metadata)))
             await conn.commit()
+            
+            logger.info(
+                "unit_upserted_preserving_whatsapp_group",
+                floatify_unit_id=floatify_unit_id,
+                operation="insert_or_update"
+            )
             
             # Hacer SELECT en la misma conexión
             select_query = "SELECT * FROM units WHERE floatify_unit_id = %s"

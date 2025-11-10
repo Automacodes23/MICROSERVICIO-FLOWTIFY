@@ -1,89 +1,199 @@
 """
-Dependencias compartidas para FastAPI
+Dependencias de FastAPI para inyección de servicios
 """
-from app.core.database import db
+from typing import Optional
+from fastapi import Depends
+
+from app.core.database import Database, db
 from app.config import settings
-from app.services.trip_service import TripService
-from app.services.event_service import EventService
-from app.services.message_service import MessageService
-from app.services.notification_service import NotificationService
-from app.integrations.evolution.client import EvolutionClient
-from app.integrations.gemini.client import GeminiClient
-from app.integrations.floatify.client import FloatifyClient
 
 
-# Clientes de integración (singleton)
-_evolution_client = None
-_gemini_client = None
-_floatify_client = None
+# Instancia global de WebhookService (singleton)
+_webhook_service: Optional[any] = None
 
 
-def get_evolution_client() -> EvolutionClient:
-    """Obtener cliente de Evolution API"""
-    global _evolution_client
-    if _evolution_client is None:
-        _evolution_client = EvolutionClient(
-            api_url=settings.evolution_api_url,
-            api_key=settings.evolution_api_key,
-            instance=settings.evolution_instance_name,
-            timeout=settings.http_timeout,
-        )
-    return _evolution_client
+async def get_database() -> Database:
+    """
+    Obtener instancia de base de datos
+    
+    Returns:
+        Instancia de Database
+    """
+    return db
 
 
-def get_gemini_client() -> GeminiClient:
-    """Obtener cliente de Gemini AI"""
-    global _gemini_client
-    if _gemini_client is None:
-        _gemini_client = GeminiClient(
-            api_key=settings.gemini_api_key,
-            model=settings.gemini_model,
-            timeout=settings.gemini_timeout,
-        )
-    return _gemini_client
+async def get_webhook_service(database: Database = Depends(get_database)):
+    """
+    Obtener instancia de WebhookService
+    
+    Usa singleton para reutilizar la misma instancia y su cliente HTTP
+    
+    Args:
+        database: Dependencia de base de datos
+        
+    Returns:
+        Instancia de WebhookService o None si webhooks están deshabilitados
+    """
+    global _webhook_service
+    
+    # Si webhooks están deshabilitados globalmente, retornar None
+    if not settings.webhooks_enabled:
+        return None
+    
+    # Si no existe la instancia, crearla
+    if _webhook_service is None:
+        try:
+            # Importar aquí para evitar circular imports
+            from app.services.webhook_service import WebhookService
+            
+            _webhook_service = WebhookService(
+                db=database,
+                target_url=settings.flowtify_webhook_url,
+                secret_key=settings.webhook_secret,
+                timeout=settings.webhook_timeout,
+            )
+        except Exception as e:
+            # Log error pero retornar None para que el sistema funcione
+            print(f"ERROR creando WebhookService: {e}")
+            return None
+    
+    return _webhook_service
 
 
-def get_floatify_client() -> FloatifyClient:
-    """Obtener cliente de Floatify"""
-    global _floatify_client
-    if _floatify_client is None:
-        _floatify_client = FloatifyClient(
-            api_url=settings.floatify_api_url,
-            api_key=settings.floatify_api_key,
-            timeout=settings.http_timeout,
-        )
-    return _floatify_client
+async def get_evolution_client():
+    """
+    Obtener instancia de Evolution API client
+    
+    Returns:
+        Instancia de EvolutionClient o None si no está configurado
+    """
+    # Si no está configurado, retornar None
+    if not settings.evolution_api_url or not settings.evolution_api_key:
+        return None
+    
+    # Importar aquí para evitar circular imports
+    from app.integrations.evolution.client import EvolutionClient
+    
+    return EvolutionClient(
+        api_url=settings.evolution_api_url,
+        api_key=settings.evolution_api_key,
+        instance=settings.evolution_instance_name,
+        timeout=settings.http_timeout,
+    )
 
 
-def get_trip_service() -> TripService:
-    """Obtener servicio de viajes"""
+async def get_trip_service(
+    database: Database = Depends(get_database),
+    evolution_client = Depends(get_evolution_client),
+    webhook_service = Depends(get_webhook_service),
+):
+    """
+    Obtener instancia de TripService con todas sus dependencias
+    
+    Args:
+        database: Dependencia de base de datos
+        evolution_client: Cliente de Evolution API
+        webhook_service: Servicio de webhooks (opcional)
+        
+    Returns:
+        Instancia configurada de TripService
+    """
+    from app.services.trip_service import TripService
+    
     return TripService(
-        db=db,
-        evolution_client=get_evolution_client(),
+        db=database,
+        evolution_client=evolution_client,
+        webhook_service=webhook_service,
     )
 
 
-def get_event_service() -> EventService:
-    """Obtener servicio de eventos"""
+async def get_event_service(
+    database: Database = Depends(get_database),
+    evolution_client = Depends(get_evolution_client),
+    webhook_service = Depends(get_webhook_service),
+):
+    """
+    Obtener instancia de EventService con todas sus dependencias
+    
+    Args:
+        database: Dependencia de base de datos
+        evolution_client: Cliente de Evolution API
+        webhook_service: Servicio de webhooks (opcional)
+        
+    Returns:
+        Instancia configurada de EventService
+    """
+    from app.services.event_service import EventService
+    
     return EventService(
-        db=db,
-        evolution_client=get_evolution_client(),
+        db=database,
+        evolution_client=evolution_client,
+        webhook_service=webhook_service,
     )
 
 
-def get_message_service() -> MessageService:
-    """Obtener servicio de mensajes"""
+async def get_message_service(
+    database: Database = Depends(get_database),
+):
+    """
+    Obtener instancia de MessageService
+    
+    Args:
+        database: Dependencia de base de datos
+        
+    Returns:
+        Instancia de MessageService
+    """
+    from app.services.message_service import MessageService
+    from app.integrations.gemini.client import GeminiClient
+    
+    gemini_client = GeminiClient(
+        api_key=settings.gemini_api_key,
+        model=settings.gemini_model,
+        timeout=settings.gemini_timeout,
+    )
+    
+    evolution_client = await get_evolution_client()
+    
     return MessageService(
-        db=db,
-        gemini_client=get_gemini_client(),
-        evolution_client=get_evolution_client(),
+        db=database,
+        gemini_client=gemini_client,
+        evolution_client=evolution_client,
     )
 
 
-def get_notification_service() -> NotificationService:
-    """Obtener servicio de notificaciones"""
+async def get_notification_service(
+    database: Database = Depends(get_database),
+    evolution_client = Depends(get_evolution_client),
+    webhook_service = Depends(get_webhook_service),
+):
+    """
+    Obtener instancia de NotificationService
+    
+    Args:
+        database: Dependencia de base de datos
+        evolution_client: Cliente de Evolution API
+        webhook_service: Servicio de webhooks (opcional)
+        
+    Returns:
+        Instancia de NotificationService
+    """
+    from app.services.notification_service import NotificationService
+    
     return NotificationService(
-        db=db,
-        evolution_client=get_evolution_client(),
+        db=database,
+        evolution_client=evolution_client,
+        webhook_service=webhook_service,
     )
 
+
+async def shutdown_webhook_service():
+    """
+    Cerrar cliente HTTP de WebhookService en shutdown
+    
+    Debe llamarse en el evento de shutdown de FastAPI
+    """
+    global _webhook_service
+    if _webhook_service:
+        await _webhook_service.close()
+        _webhook_service = None

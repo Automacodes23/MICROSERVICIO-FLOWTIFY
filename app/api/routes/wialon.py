@@ -63,8 +63,9 @@ async def receive_wialon_event(
         # Obtener content type y body
         content_type = request.headers.get("content-type", "")
         body = await request.body()
-
-        logger.info("wialon_webhook_received", content_type=content_type)
+        
+        # DEBUG: Log del evento recibido
+        logger.info("wialon_event_received", content_type=content_type, body_size=len(body))
 
         # Parsear evento según el content type
         raw_data = parse_wialon_event(body, content_type)

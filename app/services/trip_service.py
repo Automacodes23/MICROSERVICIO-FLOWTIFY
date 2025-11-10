@@ -25,9 +25,11 @@ class TripService:
         self,
         db: Database,
         evolution_client: EvolutionClient,
+        webhook_service=None,  # Inyección opcional de WebhookService
     ):
         self.db = db
         self.evolution_client = evolution_client
+        self.webhook_service = webhook_service
         self.trip_repo = TripRepository(db)
         self.unit_repo = UnitRepository(db)
         self.driver_repo = DriverRepository(db)
@@ -400,6 +402,12 @@ class TripService:
         self, trip_id: str, status: str, substatus: str
     ) -> Dict[str, Any]:
         """Actualizar estado del viaje"""
+        # Obtener estado anterior para webhook
+        old_trip = await self.trip_repo.find_by_id(trip_id)
+        old_status = old_trip["status"] if old_trip else "unknown"
+        old_substatus = old_trip["substatus"] if old_trip else "unknown"
+        
+        # Actualizar estado (lógica existente)
         trip = await self.trip_repo.update_status(trip_id, status, substatus)
         if not trip:
             raise TripNotFoundError(trip_id)
@@ -410,6 +418,39 @@ class TripService:
             status=status,
             substatus=substatus,
         )
+        
+        # Enviar webhook (no bloqueante, error tolerante)
+        logger.info(
+            "trip_status_update_webhook_check",
+            has_webhook_service=self.webhook_service is not None,
+            webhooks_enabled=True,  # Para debugging
+            trip_id=trip_id,
+        )
+        
+        if self.webhook_service:
+            try:
+                logger.info("sending_status_update_webhook", trip_id=trip_id, old_status=old_status, new_status=status)
+                
+                await self.webhook_service.send_status_update(
+                    trip_id=trip_id,
+                    old_status=old_status,
+                    old_substatus=old_substatus,
+                    new_status=status,
+                    new_substatus=substatus,
+                    change_reason="api_call",  # O pasar como parámetro
+                )
+                
+                logger.info("status_update_webhook_sent_successfully", trip_id=trip_id)
+            except Exception as e:
+                # Log pero no fallar el update de status
+                logger.error("webhook_send_failed_non_critical", error=str(e), trip_id=trip_id)
+        else:
+            logger.warning(
+                "webhook_service_is_none_skipping_webhook",
+                trip_id=trip_id,
+                message="WebhookService no está inyectado - webhooks no se enviarán"
+            )
+        
         return trip
 
     async def complete_trip(

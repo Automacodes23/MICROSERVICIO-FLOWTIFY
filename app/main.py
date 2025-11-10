@@ -54,6 +54,12 @@ async def lifespan(app: FastAPI):
     logger.info("application_shutting_down")
 
     try:
+        # Cerrar webhook service si está habilitado
+        if settings.webhooks_enabled:
+            from app.api.dependencies import shutdown_webhook_service
+            await shutdown_webhook_service()
+            logger.info("webhook_service_closed")
+        
         await db.disconnect()
         logger.info("database_disconnected")
     except Exception as e:
@@ -129,6 +135,11 @@ app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(trips.router, prefix=settings.api_prefix)
 app.include_router(wialon.router, prefix=settings.api_prefix)
 app.include_router(whatsapp.router, prefix=settings.api_prefix)
+
+# Webhook admin endpoints (solo si webhooks están habilitados)
+if settings.webhooks_enabled:
+    from app.api.routes import webhooks
+    app.include_router(webhooks.router, prefix=settings.api_prefix)
 
 
 # Root endpoint
