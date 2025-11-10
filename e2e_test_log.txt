@@ -1,0 +1,340 @@
+
+================================================================================
+TEST E2E - FLUJO COMPLETO DE VIAJE
+================================================================================
+Fecha: 2025-11-07 13:32:38
+Código de Viaje: TEST_FLOW_20251107133238
+Usuario: +5214771817823
+Conductor: +5214775589835
+Base URL: http://localhost:8000/api/v1
+================================================================================
+
+[13:32:38] [START] INICIO DEL TEST E2E
+[13:32:38] [INFO] Requisitos previos listados al usuario
+[13:32:43] [USER_INPUT] Usuario confirmó inicio del test
+[13:32:43] [CHECK] [CHECK] Verificando servidor...
+[13:32:45] [SUCCESS] [OK] Servidor activo
+[13:32:45] [INFO]   - Status: ok
+[13:32:45] [INFO]   - Service: unknown
+[13:32:45] [INFO]   - Timestamp: 2025-11-07T19:32:45.193830
+[13:32:45] [CHECK] [CHECK] Configuración de Webhook Evolution API
+[13:32:45] [INFO] Webhook esperado: https://postasthmatic-dicycly-veda.ngrok-free.dev/api/v1/whatsapp/messages
+[13:32:46] [USER_INPUT] Usuario respondió: s
+[13:32:46] [SUCCESS] Webhook confirmado como configurado
+[13:32:46] [INFO] Código único de viaje: TEST_FLOW_20251107133238
+[13:32:46] [INFO] 
+================================================================================
+[13:32:46] [INFO]                   FASE 1: CREACIÓN DE VIAJE (Simula Floatify)                   
+[13:32:46] [INFO] ================================================================================
+
+[13:32:46] [REQUEST] 
+[POST] /trips/create
+[13:32:46] [REQUEST] Payload (JSON):
+[13:32:46] [DATA] {
+  "event": "whatsapp.group.create",
+  "action": "create_group",
+  "tenant_id": 24,
+  "trip": {
+    "id": 45,
+    "code": "TEST_FLOW_20251107133238",
+    "status": "asignado",
+    "planned_start": "2025-10-06T20:00:00-06:00",
+    "planned_end": "2025-10-06T22:00:00-06:00",
+    "origin": "León",
+    "destination": "Jalisco"
+  },
+  "driver": {
+    "id": 33,
+    "name": "PRUEBA_FLOWTIFY",
+    "phone": "+5214775589835"
+  },
+  "unit": {
+    "id": 18,
+    "floatify_unit_id": "18",
+    "name": "Torton 309 41BB3T",
+    "plate": "41BB3T",
+    "wialon_id": "27538728",
+    "imei": "863719067169228"
+  },
+  "customer": {
+    "id": 6,
+    "name": "Pañales Aurora"
+  },
+  "geofences": [
+    {
+      "role": "origin",
+      "geofence_id": "685",
+      "geofence_name": "PATIO TTU",
+      "geofence_type": "circle",
+      "order": 0
+    },
+    {
+      "role": "loading",
+      "geofence_id": "9001",
+      "geofence_name": "CEDIS COPPEL LEON",
+      "geofence_type": "polygon",
+      "order": 1
+    },
+    {
+      "role": "unloading",
+      "geofence_id": "9002",
+      "geofence_name": "BODEGA COPPEL JALISCO",
+      "geofence_type": "polygon",
+      "order": 2
+    }
+  ],
+  "whatsapp_participants": [
+    "+5214771817823",
+    "+5214775589835"
+  ],
+  "metadata": {
+    "tipo": "Cliente",
+    "modalidad": "Renta",
+    "priority": "medium"
+  }
+}
+[13:32:52] [RESPONSE] Status Code: 200
+[13:32:52] [RESPONSE] Response (JSON):
+[13:32:52] [DATA] {
+  "success": true,
+  "trip_id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+  "trip_code": "TEST_FLOW_20251107133238",
+  "whatsapp_group_id": "120363422139022976@g.us",
+  "welcome_message_sent": true,
+  "message": "Viaje creado exitosamente"
+}
+[13:32:52] [SUCCESS] [OK] Request exitoso
+[13:32:52] [SUCCESS] [OK] Mensaje de bienvenida enviado
+[13:32:52] [USER_ACTION] >>> Viaje creado. Revisa tu WhatsApp (+5214771817823):
+  - Deberías ser agregado al grupo '120363422139022976@g.us'
+  - Deberías ver un mensaje de bienvenida del bot
+  - El mensaje debería mencionar el viaje 'TEST_FLOW_20251107133238'
+  - El grupo incluye a ambos participantes
+[13:32:52] [PAUSE] Esperando acción del usuario...
+[13:32:55] [RESUME] Usuario confirmó. Continuando...
+[13:32:56] [INFO] Verificando BD para trip_id: 8b1be776-bc10-11f0-8bb1-f4b5205b5b70
+[13:32:56] [INFO] Estado Esperado: pending -> NULL
+[13:32:56] [INFO] [OK] Status Actual: pending
+[13:32:56] [INFO] [OK] Substatus Actual: NULL
+[13:32:58] [INFO] 
+================================================================================
+[13:32:58] [INFO] MESSAGING CHECK - Trip: 8b1be776-bc10-11f0-8bb1-f4b5205b5b70, Group: 120363422139022976@g.us
+[13:32:58] [INFO] ================================================================================
+[13:32:58] [INFO] [UNIT] ID: 8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70, Name: Torton 309 41BB3T
+[13:32:58] [INFO] [UNIT] WhatsApp Group ID: 120363422139022976@g.us
+[13:32:58] [INFO] [UNIT] WhatsApp Group Name: Unidad Torton 309 41BB3T - 41BB3T
+[13:32:58] [INFO] [CONVERSATION] ID: 8c355c4b-bc10-11f0-8bb1-f4b5205b5b70, Status: active
+[13:32:58] [INFO] [CONVERSATION] Group ID: 120363422139022976@g.us
+[13:32:58] [ERROR] [ERROR] No hay mensajes en la tabla messages
+[13:32:58] [WARNING] [WARNING] No hay interacciones de IA registradas
+[13:32:58] [INFO] ================================================================================
+
+[13:32:58] [INFO] 
+================================================================================
+[13:32:58] [INFO]                   FASE 2: INICIO DE VIAJE (Simula Escaneo QR)                   
+[13:32:58] [INFO] ================================================================================
+
+[13:32:58] [REQUEST] 
+[POST] /trips/status-change
+[13:32:58] [REQUEST] Payload (JSON):
+[13:32:58] [DATA] {
+  "event": "trip.status.changed",
+  "timestamp": 1762543978,
+  "tenant_id": 24,
+  "trip_id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+  "trip_code": "TEST_FLOW_20251107133238",
+  "from_status": "asignado",
+  "to_status": "en_ruta_carga",
+  "trigger": "qr_scan",
+  "substatus": "rumbo_a_zona_carga",
+  "trip": {
+    "id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+    "code": "TEST_FLOW_20251107133238",
+    "tenant_id": 24
+  },
+  "driver": {
+    "id": 33,
+    "name": "PRUEBA_FLOWTIFY",
+    "phone": "+5214775589835"
+  },
+  "unit": {
+    "id": 18,
+    "name": "Torton 309 41BB3T",
+    "qr_token": "QR-ABC-123"
+  },
+  "metadata": {
+    "location": {
+      "lat": 21.0593683,
+      "lon": -101.7722416
+    }
+  }
+}
+[13:33:01] [RESPONSE] Status Code: 200
+[13:33:01] [RESPONSE] Response (JSON):
+[13:33:01] [DATA] {
+  "success": true,
+  "message": "Evento de cambio de estado procesado exitosamente",
+  "data": {
+    "id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+    "code": null,
+    "floatify_trip_id": "TEST_FLOW_20251107133238",
+    "customer_id": null,
+    "unit_id": "8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70",
+    "driver_id": "8b1b4b49-bc10-11f0-8bb1-f4b5205b5b70",
+    "substatus": null,
+    "origin": null,
+    "destination": null,
+    "started_at": null,
+    "completed_at": null,
+    "status": "pending",
+    "qr_code": null,
+    "qr_scanned_at": null,
+    "trip_started_at": null,
+    "trip_ended_at": null,
+    "whatsapp_group_id": "120363422139022976@g.us",
+    "whatsapp_group_name": "Unidad Torton 309 41BB3T - 41BB3T",
+    "cargo_description": null,
+    "metadata": {
+      "tipo": "Cliente",
+      "modalidad": "Renta",
+      "priority": "medium",
+      "origin": "León",
+      "destination": "Jalisco",
+      "tenant_id": 24,
+      "planned_start": "2025-10-06T20:00:00-06:00",
+      "planned_end": "2025-10-06T22:00:00-06:00"
+    },
+    "created_at": "2025-11-07T13:32:48",
+    "updated_at": "2025-11-07T13:32:50"
+  }
+}
+[13:33:01] [SUCCESS] [OK] Request exitoso
+[13:33:04] [INFO] Verificando BD para trip_id: 8b1be776-bc10-11f0-8bb1-f4b5205b5b70
+[13:33:04] [INFO] Estado Esperado: en_ruta_carga -> rumbo_a_zona_carga
+[13:33:04] [INFO] [OK] Status Actual: en_ruta_carga
+[13:33:04] [INFO] [OK] Substatus Actual: rumbo_a_zona_carga
+[13:33:04] [INFO] 
+================================================================================
+[13:33:04] [INFO]                 FASE 3: EVENTO WIALON - LLEGADA A ZONA DE CARGA                 
+[13:33:04] [INFO] ================================================================================
+
+[13:33:06] [REQUEST] 
+[GET] /wialon/debug/trip/27538728
+[13:33:08] [RESPONSE] Status Code: 200
+[13:33:08] [RESPONSE] Response (JSON):
+[13:33:08] [DATA] {
+  "wialon_unit_id": "27538728",
+  "unit_found": true,
+  "unit": {
+    "id": "8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70",
+    "floatify_unit_id": "18",
+    "wialon_unit_id": "27538728",
+    "name": "Torton 309 41BB3T",
+    "plates": null,
+    "wialon_id": null,
+    "plate": "41BB3T",
+    "metadata": {
+      "id": 18,
+      "floatify_unit_id": "18",
+      "name": "Torton 309 41BB3T",
+      "plate": "41BB3T",
+      "wialon_id": "27538728",
+      "imei": "863719067169228"
+    },
+    "created_at": "2025-11-07T13:32:48",
+    "updated_at": "2025-11-07T13:32:50",
+    "whatsapp_group_id": "120363422139022976@g.us",
+    "whatsapp_group_name": "Unidad Torton 309 41BB3T - 41BB3T"
+  },
+  "trip_found": true,
+  "trip": {
+    "id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+    "code": null,
+    "floatify_trip_id": "TEST_FLOW_20251107133238",
+    "customer_id": null,
+    "unit_id": "8b1a5d29-bc10-11f0-8bb1-f4b5205b5b70",
+    "driver_id": "8b1b4b49-bc10-11f0-8bb1-f4b5205b5b70",
+    "substatus": "rumbo_a_zona_carga",
+    "origin": null,
+    "destination": null,
+    "started_at": null,
+    "completed_at": null,
+    "status": "en_ruta_carga",
+    "qr_code": null,
+    "qr_scanned_at": null,
+    "trip_started_at": null,
+    "trip_ended_at": null,
+    "whatsapp_group_id": "120363422139022976@g.us",
+    "whatsapp_group_name": "Unidad Torton 309 41BB3T - 41BB3T",
+    "cargo_description": null,
+    "metadata": {
+      "tipo": "Cliente",
+      "modalidad": "Renta",
+      "priority": "medium",
+      "origin": "León",
+      "destination": "Jalisco",
+      "tenant_id": 24,
+      "planned_start": "2025-10-06T20:00:00-06:00",
+      "planned_end": "2025-10-06T22:00:00-06:00",
+      "last_status_change": {
+        "trigger": "qr_scan",
+        "timestamp": 1762543978,
+        "from_status": "asignado",
+        "to_status": "en_ruta_carga",
+        "metadata": {
+          "location": {
+            "lat": 21.0593683,
+            "lon": -101.7722416
+          }
+        }
+      },
+      "last_known_location": {
+        "lat": 21.0593683,
+        "lon": -101.7722416
+      },
+      "last_qr_scan": {
+        "timestamp": 1762543978,
+        "location": {
+          "lat": 21.0593683,
+          "lon": -101.7722416
+        },
+        "unit": {
+          "id": 18,
+          "name": "Torton 309 41BB3T",
+          "qr_token": "QR-ABC-123"
+        },
+        "driver": {
+          "id": 33,
+          "name": "PRUEBA_FLOWTIFY",
+          "phone": "+5214775589835"
+        }
+      }
+    },
+    "created_at": "2025-11-07T13:32:48",
+    "updated_at": "2025-11-07T13:33:00"
+  }
+}
+[13:33:08] [SUCCESS] [OK] Request exitoso
+[13:33:08] [REQUEST] 
+[POST] /wialon/events
+[13:33:08] [REQUEST] Payload (FORM):
+[13:33:08] [DATA] {'unit_name': 'Torton 309 41BB3T', 'unit_id': '27538728', 'imei': '863719067169228', 'latitude': 21.0505, 'longitude': -101.7995, 'altitude': 1796, 'speed': 6.2, 'course': 270, 'address': 'ZONA DE CARGA - PLANTA ACME, León, Gto., México', 'pos_time': '2024-10-07 01:28:20', 'driver_name': 'PRUEBA FLOWTIFY', 'driver_code': '29', 'geofence_name': 'PLANTA ACME - ZONA CARGA', 'geofence_id': '9001', 'notification_type': 'geofence_entry', 'notification_id': 'NOTIF_1762543988_8383', 'event_time': 1728280100}
+[13:33:11] [RESPONSE] Status Code: 200
+[13:33:11] [RESPONSE] Response (JSON):
+[13:33:11] [DATA] {
+  "success": true,
+  "event_id": "b1754f24-86ce-488d-92e0-103fe9713885",
+  "trip_id": "8b1be776-bc10-11f0-8bb1-f4b5205b5b70",
+  "message": "Event processed successfully"
+}
+[13:33:11] [SUCCESS] [OK] Request exitoso
+[13:33:11] [USER_ACTION] >>> Evento de llegada a carga enviado.
+  - Revisa WhatsApp
+  - Deberías recibir un mensaje del bot preguntando si iniciaste la carga
+  - Algo como: 'Llegaste a PLANTA ACME - ZONA CARGA. Ya iniciaste la carga?'
+[13:33:11] [PAUSE] Esperando acción del usuario...
+[13:37:03] [INTERRUPT] Test interrumpido por el usuario (Ctrl+C)
+
+================================================================================
+Log finalizado: 2025-11-07 13:37:03
+================================================================================

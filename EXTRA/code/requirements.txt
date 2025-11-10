@@ -1,0 +1,18 @@
+# Evolution API - Verificación de Mensajes
+# =====================================
+
+# Dependencias de Python
+cliente-evolution-api>=1.0.0
+flask>=2.0.0
+requests>=2.25.0
+websockets>=10.0
+asyncio
+json
+logging
+datetime
+typing
+
+# Para desarrollo
+pytest>=6.0.0
+black>=21.0.0
+flake8>=3.8.0

@@ -1,0 +1,63 @@
+{
+  "event": "whatsapp.group.create",
+  "action": "create_group",
+  "tenant_id": 24,
+  "trip": {
+    "id": 45,
+    "code": "TEST_FLOW_20241006123456",
+    "status": "asignado",
+    "planned_start": "2025-10-06T20:00:00-06:00",
+    "planned_end": "2025-10-06T22:00:00-06:00",
+    "origin": "León",
+    "destination": "Jalisco"
+  },
+  "driver": {
+    "id": 33,
+    "name": "PRUEBA_FLOWTIFY",
+    "phone": "+5214775589835"
+  },
+  "unit": {
+    "id": 18,
+    "floatify_unit_id": "18",
+    "name": "Torton 309 41BB3T",
+    "plate": "41BB3T",
+    "wialon_id": "27538728",
+    "imei": "863719067169228"
+  },
+  "customer": {
+    "id": 6,
+    "name": "Pañales Aurora"
+  },
+  "geofences": [
+    {
+      "role": "origin",
+      "geofence_id": "685",
+      "geofence_name": "PATIO TTU",
+      "geofence_type": "circle",
+      "order": 0
+    },
+    {
+      "role": "loading",
+      "geofence_id": "9001",
+      "geofence_name": "CEDIS COPPEL LEON",
+      "geofence_type": "polygon",
+      "order": 1
+    },
+    {
+      "role": "unloading",
+      "geofence_id": "9002",
+      "geofence_name": "BODEGA COPPEL JALISCO",
+      "geofence_type": "polygon",
+      "order": 2
+    }
+  ],
+  "whatsapp_participants": [
+    "+5214771817823",
+    "+5214775589835"
+  ],
+  "metadata": {
+    "tipo": "Cliente",
+    "modalidad": "Renta",
+    "priority": "medium"
+  }
+}

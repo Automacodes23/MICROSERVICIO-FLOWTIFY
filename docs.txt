@@ -1,0 +1,1978 @@
+# Microservicio Python para Gestión Logística - Síntesis Completa
+
+## 📋 Resumen Ejecutivo
+
+Sistema de microservicio en Python (FastAPI) para gestionar 2,500 unidades de transporte logístico, integrando:
+- **Floatify**: Sistema principal (gestión de viajes)
+- **Wialon**: Plataforma de rastreo GPS (notificaciones en tiempo real)
+- **WhatsApp via Evolution API**: Comunicación con operadores
+- **Gemini AI**: Bot inteligente para procesamiento de lenguaje natural
+
+---
+
+## 🏗️ Arquitectura Optimizada
+
+```
+┌─────────────┐          ┌──────────────────────┐
+│  Floatify   │─────────▶│   Microservicio      │
+└─────────────┘          │   Python (FastAPI)   │
+                         │                       │
+┌─────────────┐          │  - Gestión de viajes │
+│   Wialon    │─────────▶│  - Procesamiento IA  │
+│ Notificaciones│         │  - Orquestación      │
+└─────────────┘          │  - Logs centralizados│
+                         └───────┬──────┬───────┘
+                                 │      │
+              ┌──────────────────┘      └─────────────┐
+              ▼                                        ▼
+     ┌────────────────┐                      ┌──────────────┐
+     │  Evolution API │                      │   Supabase   │
+     │  (WhatsApp)    │                      │ (PostgreSQL) │
+     └────────┬───────┘                      └──────────────┘
+              │
+              ▼
+     ┌────────────────┐
+     │   Gemini AI    │
+     │  (NLU/STT)     │
+     └────────────────┘
+```
+
+---
+
+## 🗄️ Base de Datos (Supabase - PostgreSQL)
+
+### Tablas Principales
+
+```sql
+-- 1. Unidades de transporte
+CREATE TABLE units (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  wialon_id TEXT UNIQUE,
+  plate TEXT,
+  imei TEXT,
+  provider TEXT DEFAULT 'wialon',
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Operadores/Conductores
+CREATE TABLE drivers (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT UNIQUE NOT NULL,
+  wialon_driver_code TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. Viajes
+CREATE TABLE trips (
+  id BIGSERIAL PRIMARY KEY,
+  external_id TEXT UNIQUE,
+  tenant_id INTEGER NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  unit_id BIGINT REFERENCES units(id),
+  driver_id BIGINT REFERENCES drivers(id),
+  customer_id INTEGER,
+  
+  -- Estados
+  status TEXT DEFAULT 'planned',
+  substatus TEXT DEFAULT 'por_iniciar',
+  
+  -- Información del viaje
+  origin TEXT,
+  destination TEXT,
+  planned_start TIMESTAMPTZ,
+  planned_end TIMESTAMPTZ,
+  actual_start TIMESTAMPTZ,
+  actual_end TIMESTAMPTZ,
+  
+  -- Metadata flexible
+  metadata JSONB DEFAULT '{}'::jsonb,
+  
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Índices para trips
+CREATE INDEX idx_trips_tenant ON trips(tenant_id);
+CREATE INDEX idx_trips_unit ON trips(unit_id);
+CREATE INDEX idx_trips_status ON trips(status);
+CREATE INDEX idx_trips_external ON trips(external_id);
+
+-- 4. Geocercas
+CREATE TABLE geofences (
+  id BIGSERIAL PRIMARY KEY,
+  wialon_id TEXT,
+  name TEXT NOT NULL,
+  type TEXT, -- 'origin', 'loading', 'unloading', 'depot', 'checkpoint'
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  radius_m INTEGER,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. Relación Viaje-Geocercas
+CREATE TABLE trip_geofences (
+  id BIGSERIAL PRIMARY KEY,
+  trip_id BIGINT REFERENCES trips(id) ON DELETE CASCADE,
+  geofence_id BIGINT REFERENCES geofences(id),
+  role TEXT NOT NULL, -- 'origin', 'loading', 'unloading', 'waypoint'
+  sequence INTEGER DEFAULT 0,
+  entered_at TIMESTAMPTZ,
+  exited_at TIMESTAMPTZ,
+  metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX idx_trip_geofences_trip ON trip_geofences(trip_id);
+
+-- 6. Eventos de Wialon
+CREATE TABLE events (
+  id BIGSERIAL PRIMARY KEY,
+  external_id TEXT UNIQUE,
+  trip_id BIGINT REFERENCES trips(id),
+  unit_id BIGINT REFERENCES units(id),
+  
+  source TEXT NOT NULL DEFAULT 'wialon',
+  event_type TEXT NOT NULL,
+  
+  -- Datos del evento
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  speed DOUBLE PRECISION,
+  address TEXT,
+  
+  -- Payload completo de Wialon
+  raw_payload JSONB DEFAULT '{}'::jsonb,
+  
+  -- Control de procesamiento
+  processed BOOLEAN DEFAULT false,
+  processed_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_events_trip ON events(trip_id, created_at DESC);
+CREATE INDEX idx_events_unprocessed ON events(processed) WHERE processed = false;
+CREATE INDEX idx_events_external ON events(external_id);
+
+-- 7. Conversaciones de WhatsApp
+CREATE TABLE conversations (
+  id BIGSERIAL PRIMARY KEY,
+  trip_id BIGINT REFERENCES trips(id) UNIQUE,
+  whatsapp_group_id TEXT UNIQUE NOT NULL,
+  group_name TEXT,
+  participants JSONB DEFAULT '[]'::jsonb,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 8. Mensajes
+CREATE TABLE messages (
+  id BIGSERIAL PRIMARY KEY,
+  conversation_id BIGINT REFERENCES conversations(id),
+  trip_id BIGINT REFERENCES trips(id),
+  
+  -- Identificación del mensaje
+  whatsapp_message_id TEXT,
+  
+  -- Remitente
+  sender_type TEXT, -- 'driver', 'bot', 'supervisor', 'system'
+  sender_phone TEXT,
+  
+  -- Contenido
+  direction TEXT, -- 'inbound', 'outbound'
+  content TEXT NOT NULL,
+  transcription TEXT, -- Si era audio
+  
+  -- Resultado de IA
+  ai_result JSONB,
+  
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at DESC);
+CREATE INDEX idx_messages_trip ON messages(trip_id, created_at DESC);
+
+-- 9. Interacciones con IA
+CREATE TABLE ai_interactions (
+  id BIGSERIAL PRIMARY KEY,
+  message_id BIGINT REFERENCES messages(id),
+  trip_id BIGINT REFERENCES trips(id),
+  
+  input_text TEXT NOT NULL,
+  response_text TEXT,
+  response_metadata JSONB DEFAULT '{}'::jsonb,
+  
+  -- Clasificación
+  intent TEXT,
+  confidence DOUBLE PRECISION,
+  entities JSONB DEFAULT '{}'::jsonb,
+  
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 10. Configuraciones dinámicas
+CREATE TABLE configurations (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  scope TEXT NOT NULL, -- 'global', 'tenant', 'geofence_type', 'trip'
+  scope_id INTEGER,
+  
+  config JSONB NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_config_scope ON configurations(scope, scope_id, is_active);
+
+-- 11. System Logs
+CREATE TABLE system_logs (
+  id BIGSERIAL PRIMARY KEY,
+  trace_id UUID DEFAULT gen_random_uuid(),
+  level TEXT NOT NULL, -- 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
+  service TEXT NOT NULL,
+  message TEXT NOT NULL,
+  context JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_logs_level_created ON system_logs(level, created_at DESC);
+CREATE INDEX idx_logs_trace ON system_logs(trace_id);
+```
+
+---
+
+## 📡 PAYLOADS CORREGIDOS
+
+### 1. Creación de Viaje (Floatify → Microservicio)
+
+**Mantiene estructura original - ✅ Correcto**
+
+```json
+{
+  "event": "whatsapp.group.create",
+  "action": "create_group",
+  "tenant_id": 24,
+  "trip": {
+    "id": 45,
+    "code": "CLI-PA-ALE-251006-A7W",
+    "status": "asignado",
+    "planned_start": "2025-10-06T20:00:00-06:00",
+    "planned_end": "2025-10-06T22:00:00-06:00",
+    "origin": "León",
+    "destination": "Jalisco"
+  },
+  "driver": {
+    "id": 33,
+    "name": "PRUEBA_FLOWTIFY",
+    "phone": "+5214775589835"
+  },
+  "unit": {
+    "id": 18,
+    "name": "Torton 309 41BB3T",
+    "plate": "41BB3T",
+    "wialon_id": "27538728",
+    "imei": "863719067169228"
+  },
+  "customer": {
+    "id": 6,
+    "name": "Pañales Aurora"
+  },
+  "geofences": [
+    {
+      "role": "origin",
+      "geofence_id": "685",
+      "geofence_name": "PATIO TTU",
+      "geofence_type": "circle"
+    },
+    {
+      "role": "loading",
+      "geofence_id": "9001",
+      "geofence_name": "CEDIS COPPEL LEON",
+      "geofence_type": "polygon"
+    },
+    {
+      "role": "unloading",
+      "geofence_id": "9002",
+      "geofence_name": "BODEGA COPPEL JALISCO",
+      "geofence_type": "polygon"
+    }
+  ],
+  "whatsapp_participants": [
+    "+5214771817823",
+    "+5214775589835"
+  ],
+  "metadata": {
+    "tipo": "Cliente",
+    "modalidad": "Renta",
+    "priority": "medium"
+  }
+}
+```
+
+---
+
+### 2. Inicio de Viaje (Escaneo QR)
+
+**Mantiene estructura original - ✅ Correcto**
+
+```json
+{
+  "event": "trip.status.changed",
+  "timestamp": 1731100000,
+  "tenant_id": 24,
+  "trip_id": 45,
+  "trip_code": "CLI-PA-ALE-251006-A7W",
+  "from_status": "asignado",
+  "to_status": "en_ruta_carga",
+  "trigger": "qr_scan",
+  "trip": {
+    "id": 45,
+    "tenant_id": 24,
+    "code": "CLI-PA-ALE-251006-A7W"
+  },
+  "driver": {
+    "id": 33,
+    "name": "PRUEBA_FLOWTIFY",
+    "phone": "+5214775589835"
+  },
+  "unit": {
+    "id": 18,
+    "name": "Torton 309 41BB3T",
+    "qr_token": "QR-ABC-123"
+  },
+  "metadata": {
+    "location": {
+      "lat": 21.0593683,
+      "lon": -101.7722416
+    }
+  }
+}
+```
+
+---
+
+### 3. NOTIFICACIONES DE WIALON (CORREGIDAS)
+
+**IMPORTANTE**: Wialon envía las notificaciones mediante HTTP POST con el body como `application/x-www-form-urlencoded` o texto plano. Las variables (tags) se sustituyen con valores reales.
+
+#### 3.1 Exceso de Velocidad
+
+```
+unit_name=Torton 309 41BB3T&unit_id=27538728&speed=125.5&max_speed=80&latitude=21.0593683&longitude=-101.7722416&altitude=1797&course=90&address=Carretera León-Aguascalientes Km 15, León, Guanajuato, México&pos_time=2024-10-07 01:01:00&driver_name=PRUEBA FLOWTIFY&driver_code=29&notification_type=speed_violation&event_time=1728278460&geofence_name=&notification_id=12346
+```
+
+**Versión JSON (si configuraste JSON en Wialon)**:
+```json
+{
+  "unit_name": "Torton 309 41BB3T",
+  "unit_id": "27538728",
+  "imei": "863719067169228",
+  "speed": 125.5,
+  "max_speed": 80,
+  "latitude": 21.0593683,
+  "longitude": -101.7722416,
+  "altitude": 1797,
+  "course": 90,
+  "address": "Carretera León-Aguascalientes Km 15, León, Guanajuato, México",
+  "pos_time": "2024-10-07 01:01:00",
+  "driver_name": "PRUEBA FLOWTIFY",
+  "driver_code": "29",
+  "notification_type": "speed_violation",
+  "event_time": 1728278460,
+  "geofence_name": ""
+}
+```
+
+#### 3.2 Entrada a Geocerca
+
+```
+unit_name=Torton 309 41BB3T&unit_id=27538728&imei=863719067169228&latitude=21.0505&longitude=-101.7995&altitude=1796&speed=6.2&course=270&address=ZONA DE CARGA - PLANTA ACME, León, Gto., México&pos_time=2024-10-07 01:28:20&driver_name=PRUEBA FLOWTIFY&driver_code=29&geofence_name=PLANTA ACME - ZONA CARGA&geofence_id=9001&notification_type=geofence_entry&event_time=1728280100
+```
+
+**Versión JSON**:
+```json
+{
+  "unit_name": "Torton 309 41BB3T",
+  "unit_id": "27538728",
+  "imei": "863719067169228",
+  "latitude": 21.0505,
+  "longitude": -101.7995,
+  "altitude": 1796,
+  "speed": 6.2,
+  "course": 270,
+  "address": "ZONA DE CARGA - PLANTA ACME, León, Gto., México",
+  "pos_time": "2024-10-07 01:28:20",
+  "driver_name": "PRUEBA FLOWTIFY",
+  "driver_code": "29",
+  "geofence_name": "PLANTA ACME - ZONA CARGA",
+  "geofence_id": "9001",
+  "notification_type": "geofence_entry",
+  "event_time": 1728280100
+}
+```
+
+#### 3.3 Salida de Geocerca
+
+```json
+{
+  "unit_name": "Torton 309 41BB3T",
+  "unit_id": "27538728",
+  "imei": "863719067169228",
+  "latitude": 21.051,
+  "longitude": -101.799,
+  "altitude": 1796,
+  "speed": 8.4,
+  "course": 90,
+  "address": "ZONA DE CARGA - PLANTA ACME, León, Gto., México",
+  "pos_time": "2024-10-07 01:33:20",
+  "driver_name": "PRUEBA FLOWTIFY",
+  "driver_code": "29",
+  "geofence_name": "PLANTA ACME - ZONA CARGA",
+  "geofence_id": "9001",
+  "notification_type": "geofence_exit",
+  "event_time": 1728280400
+}
+```
+
+#### 3.4 Pérdida de Conexión
+
+```json
+{
+  "unit_name": "Torton 309 41BB3T",
+  "unit_id": "27538728",
+  "imei": "863719067169228",
+  "latitude": 21.0593683,
+  "longitude": -101.7722416,
+  "pos_time": "2024-10-07 01:05:00",
+  "driver_name": "PRUEBA FLOWTIFY",
+  "driver_code": "29",
+  "notification_type": "connection_lost",
+  "event_time": 1728278700,
+  "last_message_time": "2024-10-07 01:03:00"
+}
+```
+
+#### 3.5 Botón de Pánico
+
+```json
+{
+  "unit_name": "Torton 309 41BB3T",
+  "unit_id": "27538728",
+  "imei": "863719067169228",
+  "latitude": 21.0593683,
+  "longitude": -101.7722416,
+  "altitude": 1797,
+  "speed": 0,
+  "course": 0,
+  "address": "Carretera León-Aguascalientes Km 15, León, Guanajuato, México",
+  "pos_time": "2024-10-07 01:03:00",
+  "driver_name": "PRUEBA FLOWTIFY",
+  "driver_code": "29",
+  "notification_type": "panic_button",
+  "event_time": 1728278580
+}
+```
+
+#### 3.6 Desviación de Ruta
+
+**NUEVO PAYLOAD** - Estructura para detección de desviación:
+
+```json
+{
+  "unit_name": "Torton 309 41BB3T",
+  "unit_id": "27538728",
+  "imei": "863719067169228",
+  "latitude": 21.1234567,
+  "longitude": -101.8765432,
+  "altitude": 1800,
+  "speed": 45.5,
+  "course": 180,
+  "address": "Ubicación fuera de ruta planificada",
+  "pos_time": "2024-10-07 02:15:00",
+  "driver_name": "PRUEBA FLOWTIFY",
+  "driver_code": "29",
+  "notification_type": "route_deviation",
+  "event_time": 1728282900,
+  "deviation_distance_km": 5.3,
+  "expected_geofence": "RUTA_PRINCIPAL",
+  "metadata": {
+    "severity": "medium",
+    "deviation_type": "distance"
+  }
+}
+```
+
+---
+
+### 4. Mensajes de WhatsApp (Evolution API)
+
+**Mantiene estructura original - ✅ Correcto**
+
+```json
+{
+  "event": "messages.upsert",
+  "instance": "SATECH",
+  "data": {
+    "key": {
+      "remoteJid": "120363405870310803@g.us",
+      "fromMe": false,
+      "id": "3EB0C860C180860FCD84EF",
+      "participant": "272533374910709@lid",
+      "participantPn": "5214775589835@s.whatsapp.net"
+    },
+    "pushName": "Oscar Satech Rastreo",
+    "message": {
+      "conversation": "esperando en el anden"
+    },
+    "messageType": "conversation",
+    "messageTimestamp": 1761260937
+  },
+  "sender": "5214775589835@s.whatsapp.net"
+}
+```
+
+**Mensaje con Audio (transcripción requerida)**:
+```json
+{
+  "event": "messages.upsert",
+  "instance": "SATECH",
+  "data": {
+    "key": {
+      "remoteJid": "120363405870310803@g.us",
+      "fromMe": false,
+      "id": "3EB0AUDIO123456",
+      "participantPn": "5214775589835@s.whatsapp.net"
+    },
+    "pushName": "Oscar Satech Rastreo",
+    "message": {
+      "audioMessage": {
+        "url": "https://mmg.whatsapp.net/...",
+        "mimetype": "audio/ogg; codecs=opus",
+        "seconds": 15
+      }
+    },
+    "messageType": "audioMessage",
+    "messageTimestamp": 1761260950
+  }
+}
+```
+
+---
+
+### 5. Cierre de Viaje
+
+**CORREGIDO CON ESTRUCTURA APROPIADA**:
+
+```json
+{
+  "event": "trip.completed",
+  "tenant_id": 24,
+  "trip_id": 45,
+  "trip_code": "CLI-PA-ALE-251006-A7W",
+  "final_status": "finalizado",
+  "final_substatus": "entregado_confirmado",
+  "timestamp": "2025-10-07T04:30:00Z",
+  "trigger_details": {
+    "source": "bot_message_receiver",
+    "trigger_type": "driver_confirmation",
+    "message_content": "ya termine de descargar me voy",
+    "message_id": "3EB085319579E793C2A4B4",
+    "classification": {
+      "intent": "finish_delivery",
+      "confidence": 0.95,
+      "entities": {
+        "action": "completed",
+        "location": "destination"
+      }
+    }
+  },
+  "completion_data": {
+    "actual_end": "2025-10-07T04:28:00Z",
+    "last_location": {
+      "latitude": 21.0593683,
+      "longitude": -101.7722416,
+      "address": "CEDIS COPPEL LEON"
+    },
+    "next_destination": null,
+    "requires_followup": false
+  }
+}
+```
+
+---
+
+## 🔄 Flujos de Trabajo Detallados
+
+### Flujo 1: Alta de Viaje
+
+```
+1. Floatify envía POST a /api/v1/trips/create
+2. Microservicio:
+   a. Valida payload
+   b. Crea/actualiza registros en:
+      - units
+      - drivers
+      - geofences
+      - trips
+      - trip_geofences
+   c. Crea grupo de WhatsApp via Evolution API
+   d. Inserta en conversations
+   e. Envía mensaje de bienvenida
+   f. Registra en system_logs
+3. Responde a Floatify con confirmación
+```
+
+### Flujo 2: Procesamiento de Eventos Wialon
+
+```
+1. Wialon envía POST a /api/v1/wialon/events
+2. Microservicio:
+   a. Parsea payload (form-urlencoded o JSON)
+   b. Identifica trip_id por unit_id/imei
+   c. Inserta en events con processed=false
+   d. Worker asíncrono procesa:
+      - Actualiza trips.status/substatus
+      - Marca geofence entry/exit en trip_geofences
+      - Si es crítico (pánico, desviación):
+        * Envía alerta WhatsApp inmediata
+        * Notifica a Floatify
+   e. Marca event como processed=true
+3. Responde 200 OK a Wialon
+```
+
+### Flujo 3: Interacción Bot WhatsApp
+
+```
+1. Evolution API envía webhook a /api/v1/whatsapp/messages
+2. Microservicio:
+   a. Identifica conversation_id por remoteJid
+   b. Si es audio:
+      - Descarga audio
+      - STT con Gemini (transcripción)
+   c. Inserta en messages
+   d. Envía a Gemini para análisis:
+      - Clasificación de intención
+      - Extracción de entidades
+   e. Según intención:
+      - Actualiza substatus del trip
+      - Genera respuesta contextual
+      - Envía mensaje via Evolution API
+   f. Registra en ai_interactions
+3. Si la intención es "completion":
+   - Trigger flujo de cierre
+   - Pregunta por siguiente destino
+```
+
+### Flujo 4: Cierre de Viaje
+
+```
+1. Bot detecta intención de finalización
+2. Microservicio:
+   a. Valida que esté en zona de descarga
+   b. Pregunta: "¿Cuál es tu siguiente destino?"
+   c. Procesa respuesta (taller/patio/base)
+   d. Actualiza trips:
+      - status = 'finalizado'
+      - substatus según respuesta
+      - actual_end = now()
+   e. Envía POST a Floatify con trip.completed
+   f. Opcional: cierra grupo WhatsApp
+   g. Genera reporte final
+```
+
+---
+
+## ⚙️ Configuraciones Dinámicas
+
+### Ejemplo de Configuration para Geocerca de Carga
+
+```json
+{
+  "name": "bot_zona_carga",
+  "scope": "geofence_type",
+  "scope_id": null,
+  "config": {
+    "on_entry": {
+      "send_message": true,
+      "message_template": "🚛 Hola {driver_name}, has llegado a {geofence_name}. ¿Ya iniciaste la carga?",
+      "delay_seconds": 30
+    },
+    "while_inside": {
+      "repeat_interval_minutes": 10,
+      "max_repeats": 6,
+      "message_template": "¿Cómo va la carga? Responde 'listo' cuando termines."
+    },
+    "on_exit": {
+      "require_confirmation": true,
+      "message_template": "Detectamos que saliste de {geofence_name}. ¿Confirmaste la carga?"
+    }
+  },
+  "is_active": true
+}
+```
+
+---
+
+## 🔧 Stack Tecnológico Recomendado
+
+### Backend
+- **Python 3.11+**
+- **FastAPI**: Framework web asíncrono
+- **Pydantic**: Validación de datos
+- **asyncpg**: Cliente PostgreSQL asíncrono
+- **httpx**: Cliente HTTP asíncrono
+- **python-jose**: JWT para autenticación
+
+### IA & NLP
+- **Google Gemini API**: Procesamiento de lenguaje
+- **google-cloud-speech**: STT para audios (alternativa)
+
+### Infraestructura
+- **Railway / Render**: Hosting del microservicio
+- **Supabase**: Base de datos PostgreSQL
+- **Evolution API**: Self-hosted o managed
+
+### Observabilidad
+- **structlog**: Logs estructurados
+- **sentry-sdk**: Monitoreo de errores
+- **prometheus-client**: Métricas (opcional)
+
+---
+
+## 📊 Endpoints Propuestos
+
+```
+POST   /api/v1/trips/create              # Alta de viaje
+POST   /api/v1/trips/{id}/start          # Inicio manual
+POST   /api/v1/trips/{id}/complete       # Cierre de viaje
+
+POST   /api/v1/wialon/events             # Webhook Wialon
+GET    /api/v1/wialon/notifications      # Tipos disponibles
+
+POST   /api/v1/whatsapp/messages         # Webhook Evolution API
+POST   /api/v1/whatsapp/send             # Enviar mensaje
+
+POST   /api/v1/ai/process                # Procesar con Gemini
+GET    /api/v1/ai/intents                # Intenciones disponibles
+
+GET    /api/v1/config                    # Listar configuraciones
+PUT    /api/v1/config/{id}               # Actualizar config
+
+GET    /api/v1/logs                      # Consultar logs
+GET    /api/v1/health                    # Health check
+```
+
+---
+
+## 🚀 Próximos Pasos
+
+1. ✅ Crear estructura de base de datos en Supabase
+2. ✅ Configurar Evolution API y obtener credenciales
+3. ✅ Configurar notificaciones en Wialon con URLs correctas
+4. ⏳ Implementar microservicio con endpoints básicos
+5. ⏳ Integrar Gemini para clasificación de intenciones
+6. ⏳ Implementar workers asíncronos para eventos
+7. ⏳ Configurar logs centralizados
+8. ⏳ Testing en ambiente de desarrollo
+9. ⏳ Deploy a producción
+
+---
+
+## 💡 Recomendaciones Clave
+
+1. **Usar trace_id (UUID)** en cada request para trazabilidad completa
+2. **Implementar idempotencia** en endpoints de Wialon (pueden reenviar)
+3. **Rate limiting** para proteger endpoints públicos
+4. **Validación estricta** de payloads con Pydantic
+5. **Logs estructurados** con contexto completo (tenant_id, trip_id, etc.)
+6. **Retry logic** para llamadas a APIs externas
+7. **Configurar timeouts** apropiados (Wialon espera respuesta rápida)
+
+
+# main.py
+"""
+Microservicio de Gestión Logística
+FastAPI + Supabase + Evolution API + Gemini AI
+"""
+
+from fastapi import FastAPI, HTTPException, Request, Depends, Header
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import httpx
+import structlog
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+import os
+from pydantic import BaseModel, Field
+import uuid
+import asyncpg
+import json
+
+# ============================================
+# CONFIGURACIÓN
+# ============================================
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
+EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY")
+EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE_NAME", "SATECH")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+
+# Configurar logger estructurado
+log = structlog.get_logger()
+
+# ============================================
+# POOL DE CONEXIONES A SUPABASE
+# ============================================
+
+db_pool: Optional[asyncpg.Pool] = None
+
+async def get_db_pool():
+    global db_pool
+    if db_pool is None:
+        # Extraer host y credenciales de la URL de Supabase
+        # Formato: postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres
+        db_url = SUPABASE_URL.replace("https://", "").replace("http://", "")
+        db_pool = await asyncpg.create_pool(
+            host=f"db.{db_url}",
+            port=5432,
+            user="postgres",
+            password=os.getenv("SUPABASE_DB_PASSWORD"),
+            database="postgres",
+            min_size=5,
+            max_size=20
+        )
+    return db_pool
+
+# ============================================
+# MODELOS PYDANTIC
+# ============================================
+
+class TripCreate(BaseModel):
+    event: str
+    action: str
+    tenant_id: int
+    trip: Dict[str, Any]
+    driver: Dict[str, Any]
+    unit: Dict[str, Any]
+    customer: Optional[Dict[str, Any]] = None
+    geofences: List[Dict[str, Any]] = []
+    whatsapp_participants: List[str] = []
+    metadata: Optional[Dict[str, Any]] = None
+
+class WialonEvent(BaseModel):
+    unit_name: str
+    unit_id: str
+    imei: Optional[str] = None
+    latitude: float
+    longitude: float
+    altitude: Optional[float] = None
+    speed: Optional[float] = None
+    course: Optional[int] = None
+    address: Optional[str] = None
+    pos_time: str
+    driver_name: Optional[str] = None
+    driver_code: Optional[str] = None
+    geofence_name: Optional[str] = None
+    geofence_id: Optional[str] = None
+    notification_type: str
+    event_time: int
+    max_speed: Optional[float] = None
+    deviation_distance_km: Optional[float] = None
+
+class WhatsAppMessage(BaseModel):
+    event: str
+    instance: str
+    data: Dict[str, Any]
+    sender: str
+
+class TripCompletion(BaseModel):
+    event: str = "trip.completed"
+    tenant_id: int
+    trip_id: int
+    trip_code: str
+    final_status: str = "finalizado"
+    final_substatus: str
+    timestamp: str
+    trigger_details: Dict[str, Any]
+    completion_data: Optional[Dict[str, Any]] = None
+
+# ============================================
+# LIFECYCLE MANAGER
+# ============================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    log.info("Iniciando microservicio...")
+    await get_db_pool()
+    log.info("Pool de conexiones creado")
+    yield
+    # Shutdown
+    log.info("Cerrando conexiones...")
+    if db_pool:
+        await db_pool.close()
+
+# ============================================
+# FASTAPI APP
+# ============================================
+
+app = FastAPI(
+    title="Microservicio Logística",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ============================================
+# UTILIDADES
+# ============================================
+
+async def log_to_db(
+    level: str,
+    service: str,
+    message: str,
+    context: Dict[str, Any] = None,
+    trace_id: Optional[str] = None
+):
+    """Registrar log en la base de datos"""
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO system_logs (trace_id, level, service, message, context)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            uuid.UUID(trace_id) if trace_id else uuid.uuid4(),
+            level,
+            service,
+            message,
+            json.dumps(context or {})
+        )
+
+async def find_active_trip_by_unit(unit_id: str) -> Optional[Dict]:
+    """Encontrar viaje activo por wialon_id de la unidad"""
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT t.id, t.code, t.status, t.substatus, t.tenant_id
+            FROM trips t
+            JOIN units u ON t.unit_id = u.id
+            WHERE u.wialon_id = $1
+              AND t.status NOT IN ('finalizado', 'cancelado')
+            ORDER BY t.created_at DESC
+            LIMIT 1
+            """,
+            unit_id
+        )
+        return dict(row) if row else None
+
+async def send_whatsapp_message(group_id: str, message: str):
+    """Enviar mensaje via Evolution API"""
+    url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
+    headers = {
+        "apikey": EVOLUTION_API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "number": group_id,
+        "text": message
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=payload, headers=headers)
+        return response.json()
+
+async def process_with_gemini(text: str, context: Dict = None) -> Dict:
+    """Procesar texto con Gemini AI"""
+    # Implementación simplificada
+    # En producción, usar la librería oficial de Google
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    prompt = f"""
+Eres un asistente de logística. Analiza el siguiente mensaje del conductor y clasifícalo:
+
+Mensaje: "{text}"
+
+Contexto del viaje: {json.dumps(context or {}, ensure_ascii=False)}
+
+Responde SOLO con un JSON válido con esta estructura:
+{{
+  "intent": "waiting_turn | loading_started | loading_complete | unloading_started | unloading_complete | route_update | issue_report | other",
+  "confidence": 0.0-1.0,
+  "entities": {{}},
+  "response": "respuesta natural para el conductor",
+  "action": "update_substatus | send_alert | no_action"
+}}
+"""
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=payload)
+        result = response.json()
+        
+        # Extraer texto de respuesta
+        text_response = result["candidates"][0]["content"]["parts"][0]["text"]
+        
+        # Parsear JSON de la respuesta
+        try:
+            # Limpiar markdown si existe
+            if "```json" in text_response:
+                text_response = text_response.split("```json")[1].split("```")[0]
+            return json.loads(text_response.strip())
+        except:
+            return {
+                "intent": "other",
+                "confidence": 0.5,
+                "response": "Entendido. ¿Puedes darme más detalles?",
+                "action": "no_action"
+            }
+
+# ============================================
+# ENDPOINTS
+# ============================================
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "microservicio-logistica"
+    }
+
+@app.post("/api/v1/trips/create")
+async def create_trip(payload: TripCreate, request: Request):
+    """Alta de viaje desde Floatify"""
+    trace_id = str(uuid.uuid4())
+    
+    try:
+        log.info("trip_create_received", trace_id=trace_id, trip_code=payload.trip.get("code"))
+        
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # 1. Crear/actualizar unidad
+                unit_id = await conn.fetchval(
+                    """
+                    INSERT INTO units (code, wialon_id, plate, imei, metadata)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (code) DO UPDATE SET
+                        wialon_id = EXCLUDED.wialon_id,
+                        plate = EXCLUDED.plate,
+                        updated_at = now()
+                    RETURNING id
+                    """,
+                    payload.unit.get("name"),
+                    payload.unit.get("wialon_id"),
+                    payload.unit.get("plate"),
+                    payload.unit.get("imei"),
+                    json.dumps(payload.unit)
+                )
+                
+                # 2. Crear/actualizar driver
+                driver_id = await conn.fetchval(
+                    """
+                    INSERT INTO drivers (name, phone, metadata)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (phone) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        updated_at = now()
+                    RETURNING id
+                    """,
+                    payload.driver.get("name"),
+                    payload.driver.get("phone"),
+                    json.dumps(payload.driver)
+                )
+                
+                # 3. Crear viaje
+                trip_id = await conn.fetchval(
+                    """
+                    INSERT INTO trips (
+                        external_id, tenant_id, code, unit_id, driver_id,
+                        customer_id, origin, destination,
+                        planned_start, planned_end, status, substatus, metadata
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                    RETURNING id
+                    """,
+                    str(payload.trip.get("id")),
+                    payload.tenant_id,
+                    payload.trip.get("code"),
+                    unit_id,
+                    driver_id,
+                    payload.customer.get("id") if payload.customer else None,
+                    payload.trip.get("origin"),
+                    payload.trip.get("destination"),
+                    payload.trip.get("planned_start"),
+                    payload.trip.get("planned_end"),
+                    "planned",
+                    "por_iniciar",
+                    json.dumps(payload.metadata or {})
+                )
+                
+                # 4. Crear geocercas y asociaciones
+                for gf in payload.geofences:
+                    gf_id = await conn.fetchval(
+                        """
+                        INSERT INTO geofences (wialon_id, name, type, metadata)
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT (wialon_id) DO UPDATE SET
+                            name = EXCLUDED.name
+                        RETURNING id
+                        """,
+                        gf.get("geofence_id"),
+                        gf.get("geofence_name"),
+                        gf.get("role"),
+                        json.dumps(gf)
+                    )
+                    
+                    await conn.execute(
+                        """
+                        INSERT INTO trip_geofences (trip_id, geofence_id, role, sequence)
+                        VALUES ($1, $2, $3, $4)
+                        """,
+                        trip_id,
+                        gf_id,
+                        gf.get("role"),
+                        gf.get("order", 0)
+                    )
+        
+        # 5. Crear grupo de WhatsApp
+        group_name = f"Viaje {payload.trip.get('code')}"
+        
+        # Aquí iría la lógica para crear grupo con Evolution API
+        # Por ahora simulamos con un ID
+        whatsapp_group_id = f"grupo_{trip_id}@g.us"
+        
+        # 6. Registrar conversación
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO conversations (trip_id, whatsapp_group_id, group_name, participants)
+                VALUES ($1, $2, $3, $4)
+                """,
+                trip_id,
+                whatsapp_group_id,
+                group_name,
+                json.dumps(payload.whatsapp_participants)
+            )
+        
+        # 7. Enviar mensaje de bienvenida
+        welcome_msg = f"""
+🚛 *Viaje {payload.trip.get('code')}*
+
+Operador: {payload.driver.get('name')}
+Unidad: {payload.unit.get('name')}
+Origen: {payload.trip.get('origin')}
+Destino: {payload.trip.get('destination')}
+
+Por favor escanea el código QR de la unidad para iniciar el viaje.
+"""
+        # await send_whatsapp_message(whatsapp_group_id, welcome_msg)
+        
+        await log_to_db("INFO", "trip_create", "Viaje creado exitosamente", {
+            "trip_id": trip_id,
+            "trip_code": payload.trip.get("code")
+        }, trace_id)
+        
+        return {
+            "success": True,
+            "trip_id": trip_id,
+            "whatsapp_group_id": whatsapp_group_id,
+            "message": "Viaje creado exitosamente"
+        }
+        
+    except Exception as e:
+        log.error("trip_create_error", trace_id=trace_id, error=str(e))
+        await log_to_db("ERROR", "trip_create", str(e), {}, trace_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/wialon/events")
+async def receive_wialon_event(payload: WialonEvent, request: Request):
+    """Recibir eventos de Wialon"""
+    trace_id = str(uuid.uuid4())
+    
+    try:
+        log.info("wialon_event_received", trace_id=trace_id, type=payload.notification_type)
+        
+        # 1. Buscar viaje activo
+        trip = await find_active_trip_by_unit(payload.unit_id)
+        
+        if not trip:
+            log.warning("no_active_trip", unit_id=payload.unit_id)
+            return {"message": "No active trip found"}
+        
+        # 2. Registrar evento
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            event_id = await conn.fetchval(
+                """
+                INSERT INTO events (
+                    external_id, trip_id, unit_id, source, event_type,
+                    latitude, longitude, speed, address, raw_payload
+                )
+                SELECT $1, $2, u.id, $3, $4, $5, $6, $7, $8, $9
+                FROM units u
+                WHERE u.wialon_id = $10
+                RETURNING id
+                """,
+                f"{payload.notification_type}_{payload.event_time}",
+                trip["id"],
+                "wialon",
+                payload.notification_type,
+                payload.latitude,
+                payload.longitude,
+                payload.speed,
+                payload.address,
+                payload.model_dump_json(),
+                payload.unit_id
+            )
+        
+        # 3. Procesar según tipo de evento
+        new_status = trip["status"]
+        new_substatus = trip["substatus"]
+        send_notification = False
+        notification_msg = ""
+        
+        if payload.notification_type == "geofence_entry":
+            # Lógica basada en el role de la geocerca
+            if "carga" in (payload.geofence_name or "").lower():
+                new_status = "en_zona_carga"
+                new_substatus = "esperando_inicio_carga"
+                notification_msg = f"🚛 Llegaste a {payload.geofence_name}. ¿Ya iniciaste la carga?"
+                send_notification = True
+            elif "descarga" in (payload.geofence_name or "").lower():
+                new_status = "en_zona_descarga"
+                new_substatus = "esperando_inicio_descarga"
+                notification_msg = f"📦 Llegaste a {payload.geofence_name}. Confirma cuando inicies la descarga."
+                send_notification = True
+        
+        elif payload.notification_type == "geofence_exit":
+            if "carga" in (payload.geofence_name or "").lower():
+                new_status = "en_ruta_destino"
+                new_substatus = "rumbo_a_descarga"
+        
+        elif payload.notification_type == "speed_violation":
+            notification_msg = f"⚠️ Exceso de velocidad detectado: {payload.speed}km/h (límite: {payload.max_speed}km/h)"
+            send_notification = True
+        
+        elif payload.notification_type == "panic_button":
+            notification_msg = f"🚨 ALERTA: Botón de pánico activado en {payload.unit_name}"
+            send_notification = True
+        
+        # 4. Actualizar estado del viaje
+        if new_status != trip["status"] or new_substatus != trip["substatus"]:
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    UPDATE trips
+                    SET status = $1, substatus = $2, updated_at = now()
+                    WHERE id = $3
+                    """,
+                    new_status,
+                    new_substatus,
+                    trip["id"]
+                )
+        
+        # 5. Enviar notificación si es necesario
+        if send_notification and notification_msg:
+            # Obtener grupo de WhatsApp
+            async with pool.acquire() as conn:
+                conv = await conn.fetchrow(
+                    "SELECT whatsapp_group_id FROM conversations WHERE trip_id = $1",
+                    trip["id"]
+                )
+                if conv:
+                    # await send_whatsapp_message(conv["whatsapp_group_id"], notification_msg)
+                    pass
+        
+        # 6. Marcar como procesado
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE events SET processed = true, processed_at = now() WHERE id = $1",
+                event_id
+            )
+        
+        return {"success": True, "event_id": event_id}
+        
+    except Exception as e:
+        log.error("wialon_event_error", trace_id=trace_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/whatsapp/messages")
+async def receive_whatsapp_message(payload: WhatsAppMessage, request: Request):
+    """Recibir mensajes de WhatsApp via Evolution API"""
+    trace_id = str(uuid.uuid4())
+    
+    try:
+        # Extraer datos del mensaje
+        data = payload.data
+        message_key = data.get("key", {})
+        group_id = message_key.get("remoteJid")
+        sender_phone = message_key.get("participantPn", "").replace("@s.whatsapp.net", "")
+        message_content = data.get("message", {})
+        
+        # Obtener texto
+        text = message_content.get("conversation", "")
+        
+        # Si es audio, necesitaríamos transcribirlo
+        if "audioMessage" in message_content:
+            # Aquí iría la lógica de STT
+            text = "[Audio pendiente de transcripción]"
+        
+        if not text or not group_id:
+            return {"message": "Invalid message"}
+        
+        # Buscar conversación y viaje
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            conv = await conn.fetchrow(
+                """
+                SELECT c.id as conv_id, c.trip_id, t.status, t.substatus
+                FROM conversations c
+                JOIN trips t ON c.trip_id = t.id
+                WHERE c.whatsapp_group_id = $1
+                """,
+                group_id
+            )
+        
+        if not conv:
+            return {"message": "Conversation not found"}
+        
+        # Guardar mensaje
+        async with pool.acquire() as conn:
+            msg_id = await conn.fetchval(
+                """
+                INSERT INTO messages (
+                    conversation_id, trip_id, whatsapp_message_id,
+                    sender_type, sender_phone, direction, content
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING id
+                """,
+                conv["conv_id"],
+                conv["trip_id"],
+                message_key.get("id"),
+                "driver",
+                sender_phone,
+                "inbound",
+                text
+            )
+        
+        # Procesar con IA
+        ai_result = await process_with_gemini(text, {
+            "trip_status": conv["status"],
+            "trip_substatus": conv["substatus"]
+        })
+        
+        # Guardar interacción IA
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO ai_interactions (
+                    message_id, trip_id, input_text, response_text,
+                    intent, confidence, response_metadata
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                """,
+                msg_id,
+                conv["trip_id"],
+                text,
+                ai_result.get("response"),
+                ai_result.get("intent"),
+                ai_result.get("confidence"),
+                json.dumps(ai_result)
+            )
+        
+        # Actualizar estado si es necesario
+        if ai_result.get("action") == "update_substatus":
+            intent = ai_result.get("intent")
+            new_substatus = None
+            
+            if intent == "loading_started":
+                new_substatus = "cargando"
+            elif intent == "loading_complete":
+                new_substatus = "carga_completada"
+            elif intent == "unloading_started":
+                new_substatus = "descargando"
+            elif intent == "unloading_complete":
+                # Trigger cierre de viaje
+                new_substatus = "descarga_completada"
+            
+            if new_substatus:
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        "UPDATE trips SET substatus = $1 WHERE id = $2",
+                        new_substatus,
+                        conv["trip_id"]
+                    )
+        
+        # Enviar respuesta del bot
+        if ai_result.get("response"):
+            # await send_whatsapp_message(group_id, ai_result["response"])
+            pass
+        
+        return {"success": True, "ai_result": ai_result}
+        
+    except Exception as e:
+        log.error("whatsapp_message_error", trace_id=trace_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/trips/{trip_id}/complete")
+async def complete_trip(trip_id: int, payload: TripCompletion, request: Request):
+    """Cerrar viaje"""
+    trace_id = str(uuid.uuid4())
+    
+    try:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE trips
+                SET status = $1, substatus = $2, actual_end = now()
+                WHERE id = $3
+                """,
+                payload.final_status,
+                payload.final_substatus,
+                trip_id
+            )
+        
+        # Aquí enviarías la notificación a Floatify
+        
+        await log_to_db("INFO", "trip_complete", f"Viaje {trip_id} completado", {
+            "trip_id": trip_id,
+            "final_substatus": payload.final_substatus
+        }, trace_id)
+        
+        return {"success": True, "message": "Trip completed"}
+        
+    except Exception as e:
+        log.error("trip_complete_error", trace_id=trace_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# requirements.txt
+# ============================================
+# Microservicio Logística - Dependencias
+# ============================================
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# HTTP Client
+httpx==0.25.1
+
+# Logging
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Data Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Google AI
+google-generativeai==0.3.1
+google-cloud-speech==2.23.0  # Si usas STT de Google
+
+# Utilities
+python-jose[cryptography]==3.3.0
+python-dotenv==1.0.0
+
+# Monitoring (Opcional)
+sentry-sdk[fastapi]==1.38.0
+prometheus-client==0.19.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1  # Para testing
+
+# ============================================
+# .env.example
+# ============================================
+# Copia este archivo a .env y completa los valores
+
+# Supabase
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_KEY=tu-service-role-key-aqui
+SUPABASE_DB_PASSWORD=tu-password-db
+
+# Evolution API
+EVOLUTION_API_URL=https://tu-evolution-api.com
+EVOLUTION_API_KEY=tu-api-key-aqui
+EVOLUTION_INSTANCE_NAME=SATECH
+
+# Gemini AI
+GEMINI_API_KEY=tu-gemini-api-key-aqui
+GEMINI_MODEL=gemini-1.5-flash
+
+# Wialon (si lo necesitas)
+WIALON_TOKEN=tu-wialon-token
+
+# Microservicio
+API_PORT=8000
+API_HOST=0.0.0.0
+LOG_LEVEL=INFO
+ENVIRONMENT=production
+
+# Seguridad
+WEBHOOK_SECRET=genera-un-secreto-seguro-aqui
+JWT_SECRET_KEY=genera-otro-secreto-para-jwt
+
+# Sentry (Opcional)
+SENTRY_DSN=
+
+# ============================================
+# Dockerfile
+# ============================================
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements
+COPY requirements.txt .
+
+# Instalar dependencias Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código
+COPY . .
+
+# Exponer puerto
+EXPOSE 8000
+
+# Comando de inicio
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# ============================================
+# docker-compose.yml
+# ============================================
+
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis  # Si usas caché
+
+  redis:  # Opcional, para caché
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+# ============================================
+# .gitignore
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ============================================
+# pytest.ini
+# ============================================
+
+[pytest]
+asyncio_mode = auto
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+
+# ============================================
+# config.py - Configuración centralizada
+# ============================================
+
+from pydantic_settings import BaseSettings
+from typing import Optional
+
+class Settings(BaseSettings):
+    # Supabase
+    supabase_url: str
+    supabase_key: str
+    supabase_db_password: str
+    
+    # Evolution API
+    evolution_api_url: str
+    evolution_api_key: str
+    evolution_instance_name: str = "SATECH"
+    
+    # Gemini AI
+    gemini_api_key: str
+    gemini_model: str = "gemini-1.5-flash"
+    
+    # API
+    api_port: int = 8000
+    api_host: str = "0.0.0.0"
+    log_level: str = "INFO"
+    environment: str = "development"
+    
+    # Seguridad
+    webhook_secret: str
+    jwt_secret_key: Optional[str] = None
+    
+    # Sentry
+    sentry_dsn: Optional[str] = None
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+settings = Settings()
+
+# ============================================
+# utils/logger.py - Logger configurado
+# ============================================
+
+import structlog
+import logging
+import sys
+from typing import Any
+import json
+
+def setup_logging(log_level: str = "INFO"):
+    """Configurar logging estructurado"""
+    
+    # Configurar structlog
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+    
+    # Configurar logging estándar
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=getattr(logging, log_level.upper())
+    )
+
+# ============================================
+# utils/database.py - Helpers de base de datos
+# ============================================
+
+import asyncpg
+from typing import Optional, Dict, Any, List
+import json
+
+class Database:
+    def __init__(self, pool: asyncpg.Pool):
+        self.pool = pool
+    
+    async def get_active_trip_by_unit(self, wialon_id: str) -> Optional[Dict]:
+        """Obtener viaje activo por wialon_id de la unidad"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT t.id, t.code, t.status, t.substatus, t.tenant_id
+                FROM trips t
+                JOIN units u ON t.unit_id = u.id
+                WHERE u.wialon_id = $1
+                  AND t.status NOT IN ('finalizado', 'cancelado')
+                ORDER BY t.created_at DESC
+                LIMIT 1
+                """,
+                wialon_id
+            )
+            return dict(row) if row else None
+    
+    async def get_conversation_by_group_id(self, group_id: str) -> Optional[Dict]:
+        """Obtener conversación por group_id de WhatsApp"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT c.id, c.trip_id, c.whatsapp_group_id,
+                       t.status, t.substatus, t.tenant_id
+                FROM conversations c
+                JOIN trips t ON c.trip_id = t.id
+                WHERE c.whatsapp_group_id = $1
+                """,
+                group_id
+            )
+            return dict(row) if row else None
+    
+    async def log_event(
+        self,
+        level: str,
+        service: str,
+        message: str,
+        context: Dict[str, Any] = None,
+        trace_id: Optional[str] = None
+    ):
+        """Registrar evento en system_logs"""
+        import uuid
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO system_logs (trace_id, level, service, message, context)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                uuid.UUID(trace_id) if trace_id else uuid.uuid4(),
+                level,
+                service,
+                message,
+                json.dumps(context or {})
+            )
+
+# ============================================
+# utils/whatsapp.py - Cliente WhatsApp
+# ============================================
+
+import httpx
+from typing import Dict, Any
+
+class WhatsAppClient:
+    def __init__(self, api_url: str, api_key: str, instance: str):
+        self.api_url = api_url
+        self.api_key = api_key
+        self.instance = instance
+        self.client = httpx.AsyncClient(timeout=30.0)
+    
+    async def send_text(self, number: str, text: str) -> Dict[str, Any]:
+        """Enviar mensaje de texto"""
+        url = f"{self.api_url}/message/sendText/{self.instance}"
+        headers = {
+            "apikey": self.api_key,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "number": number,
+            "text": text
+        }
+        
+        response = await self.client.post(url, json=payload, headers=headers)
+        return response.json()
+    
+    async def create_group(
+        self,
+        name: str,
+        participants: list[str]
+    ) -> Dict[str, Any]:
+        """Crear grupo de WhatsApp"""
+        url = f"{self.api_url}/group/create/{self.instance}"
+        headers = {
+            "apikey": self.api_key,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "subject": name,
+            "participants": participants
+        }
+        
+        response = await self.client.post(url, json=payload, headers=headers)
+        return response.json()
+    
+    async def close(self):
+        """Cerrar cliente HTTP"""
+        await self.client.aclose()
+
+# ============================================
+# utils/gemini.py - Cliente Gemini AI
+# ============================================
+
+import google.generativeai as genai
+from typing import Dict, Any
+import json
+
+class GeminiClient:
+    def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model)
+    
+    async def classify_driver_message(
+        self,
+        text: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Clasificar mensaje del conductor"""
+        
+        prompt = f"""
+Eres un asistente de logística. Analiza el siguiente mensaje del conductor y clasifícalo:
+
+Mensaje: "{text}"
+
+Contexto del viaje:
+- Estado actual: {context.get('status', 'desconocido')}
+- Subestado: {context.get('substatus', 'desconocido')}
+
+Responde SOLO con un JSON válido con esta estructura:
+{{
+  "intent": "waiting_turn | loading_started | loading_complete | unloading_started | unloading_complete | route_update | issue_report | other",
+  "confidence": 0.0-1.0,
+  "entities": {{}},
+  "response": "respuesta natural para el conductor",
+  "action": "update_substatus | send_alert | no_action",
+  "new_substatus": "nuevo subestado si aplica"
+}}
+"""
+        
+        try:
+            response = self.model.generate_content(prompt)
+            text_response = response.text
+            
+            # Limpiar markdown si existe
+            if "```json" in text_response:
+                text_response = text_response.split("```json")[1].split("```")[0]
+            
+            return json.loads(text_response.strip())
+            
+        except Exception as e:
+            return {
+                "intent": "other",
+                "confidence": 0.5,
+                "response": "Entendido. ¿Puedes darme más detalles?",
+                "action": "no_action"
+            }
+
+# ============================================
+# tests/test_main.py - Tests básicos
+# ============================================
+
+import pytest
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+
+def test_health_check():
+    """Test health check endpoint"""
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+
+@pytest.mark.asyncio
+async def test_create_trip():
+    """Test crear viaje"""
+    payload = {
+        "event": "whatsapp.group.create",
+        "action": "create_group",
+        "tenant_id": 24,
+        "trip": {
+            "id": 999,
+            "code": "TEST-999",
+            "status": "planned"
+        },
+        "driver": {
+            "name": "Test Driver",
+            "phone": "+5214775589999"
+        },
+        "unit": {
+            "id": 999,
+            "name": "Test Unit",
+            "wialon_id": "999999"
+        }
+    }
+    
+    # Este test fallaría sin DB real, pero muestra la estructura
+    # response = client.post("/api/v1/trips/create", json=payload)
+    # assert response.status_code == 200
+
+
+

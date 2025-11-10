@@ -1,0 +1,2 @@
+"""Floatify callbacks integration"""
+
