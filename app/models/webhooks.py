@@ -221,6 +221,7 @@ class CommunicationInfo(BaseModel):
     message_id: str = Field(..., description="ID del mensaje")
     original_message_id: Optional[str] = Field(None, description="ID del mensaje original")
     conversation_id: Optional[str] = Field(None, description="ID de la conversación")
+    driver_message: Optional[str] = Field(None, description="Mensaje original del conductor que desencadenó esta respuesta")
     response_content: str = Field(..., description="Contenido de la respuesta")
     response_type: Optional[str] = Field(None, description="Tipo de respuesta")
     language: str = Field(default="es", description="Idioma del mensaje")

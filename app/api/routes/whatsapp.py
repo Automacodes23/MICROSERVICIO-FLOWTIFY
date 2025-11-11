@@ -64,11 +64,18 @@ async def receive_whatsapp_message(
                         if conv:
                             trip_id = conv.get("trip_id")
                     
+                    # Obtener el mensaje original del conductor
+                    driver_message_text = message.data.message.get("conversation", "")
+                    
+                    # Pasar también el mensaje del conductor y el message_id original
                     await notification_service.send_notification_to_group(
                         group_id=group_id,
                         message=response_text,
                         trip_id=trip_id,
                         ai_result=ai_result,
+                        driver_message=driver_message_text,
+                        original_message_id=result.get("message_id"),
+                        conversation_id=result.get("conversation_id"),
                     )
 
         return MessageProcessedResponse(

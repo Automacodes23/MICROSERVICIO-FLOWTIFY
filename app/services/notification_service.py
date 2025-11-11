@@ -79,15 +79,21 @@ class NotificationService:
         message: str,
         trip_id: Optional[str] = None,
         ai_result: Optional[Dict[str, Any]] = None,
+        driver_message: Optional[str] = None,
+        original_message_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
     ) -> bool:
         """
         Enviar notificación directamente a un grupo
 
         Args:
             group_id: ID del grupo de WhatsApp
-            message: Mensaje a enviar
+            message: Mensaje a enviar (respuesta del bot)
             trip_id: ID del viaje (para webhook)
             ai_result: Resultado de análisis AI (para webhook)
+            driver_message: Mensaje original del conductor
+            original_message_id: ID del mensaje original del conductor
+            conversation_id: ID de la conversación
 
         Returns:
             True si se envió exitosamente, False en caso contrario
@@ -96,6 +102,40 @@ class NotificationService:
             # Enviar mensaje
             await self.evolution_client.send_text(group_id, message)
             logger.info("notification_sent_to_group", group_id=group_id)
+            
+            # Guardar el mensaje OUTBOUND del bot en la BD
+            if trip_id and conversation_id:
+                try:
+                    from app.repositories.message_repository import MessageRepository
+                    from app.core.constants import MESSAGE_DIRECTIONS, SENDER_TYPES
+                    
+                    message_repo = MessageRepository(self.db)
+                    
+                    bot_message_data = {
+                        "conversation_id": conversation_id,
+                        "trip_id": trip_id,
+                        "whatsapp_message_id": None,  # No tenemos ID de WhatsApp para mensajes salientes
+                        "sender_type": SENDER_TYPES["BOT"],
+                        "sender_phone": None,  # El bot no tiene teléfono
+                        "direction": MESSAGE_DIRECTIONS["OUTBOUND"],
+                        "content": message,
+                        "transcription": None,
+                        "ai_result": ai_result,
+                    }
+                    
+                    saved_bot_message = await message_repo.create_message(bot_message_data)
+                    logger.info(
+                        "bot_message_saved_outbound",
+                        message_id=saved_bot_message["id"],
+                        conversation_id=conversation_id,
+                        trip_id=trip_id,
+                    )
+                except Exception as save_error:
+                    logger.error(
+                        "failed_to_save_bot_message",
+                        error=str(save_error),
+                        trip_id=trip_id,
+                    )
             
             # Enviar webhook de communication_response si tenemos webhook_service
             if self.webhook_service and trip_id:
@@ -106,7 +146,7 @@ class NotificationService:
                     response_data = {
                         "sender_type": "bot",
                         "content": message,
-                        "conversation_id": None,  # TODO: Obtener de BD
+                        "conversation_id": conversation_id,
                         "response_type": "ai_response",
                         "ai_model": "gemini-pro",
                         "confidence": ai_result.get("confidence", 0) if ai_result else 0,
@@ -115,6 +155,9 @@ class NotificationService:
                             "message_sent": True,
                             "delivery_status": "sent",
                         },
+                        # ✅ NUEVO: Agregar mensaje original del conductor
+                        "driver_message": driver_message,
+                        "original_message_id": original_message_id,
                         "context": {},
                         "metadata": {},
                     }

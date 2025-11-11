@@ -1,3 +1,4 @@
+
 """
 Script para limpiar TODA la base de datos (todas las tablas)
 Útil para pruebas cuando la BD se llena de datos innecesarios

@@ -856,6 +856,8 @@ class WebhookService:
                 "message_id": message_id,
                 "original_message_id": response_data.get("original_message_id"),
                 "conversation_id": response_data.get("conversation_id"),
+                # ✅ NUEVO: Agregar mensaje original del conductor
+                "driver_message": response_data.get("driver_message"),
                 "response_content": response_data.get("content"),
                 "response_type": response_data.get("response_type"),
                 "language": "es",

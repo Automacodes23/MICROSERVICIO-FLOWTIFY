@@ -1,7 +1,8 @@
 """
 Parser para eventos de Wialon
 """
-from typing import Dict, Any, Union
+import re
+from typing import Dict, Any, Optional, Union
 from urllib.parse import parse_qs
 from app.core.logging import get_logger
 
@@ -65,6 +66,46 @@ def parse_wialon_event(
         return {}
 
 
+def _sanitize_numeric_string(value: str) -> Optional[str]:
+    """
+    Extraer la porción numérica de un string que pueda incluir unidades
+    o texto adicional (ej. '4 km/h', '≈ 10.5m', '2,3').
+    """
+    if not value:
+        return None
+
+    # Normalizar comas decimales comunes en LATAM/EU
+    normalized = value.replace(",", ".")
+
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", normalized)
+    if match:
+        return match.group(0)
+    return None
+
+
+def _clean_placeholder(value: Any) -> Any:
+    """
+    Reemplaza variables de Wialon no resueltas por None para evitar
+    propagar valores como '%ZONE%'.
+    """
+    if isinstance(value, str) and value.startswith("%") and value.endswith("%"):
+        return None
+    return value
+
+
+NUMERIC_FIELDS = {
+    "latitude",
+    "longitude",
+    "altitude",
+    "speed",
+    "course",
+    "event_time",
+    "max_speed",
+    "deviation_distance_km",
+    "last_message_time",
+}
+
+
 def _convert_types(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Convertir strings a tipos apropiados
@@ -82,14 +123,36 @@ def _convert_types(data: Dict[str, Any]) -> Dict[str, Any]:
             result[key] = value
             continue
 
-        # Intentar convertir a número
-        if value.replace(".", "", 1).replace("-", "", 1).isdigit():
-            if "." in value:
-                result[key] = float(value)
-            else:
-                result[key] = int(value)
-        else:
+        # ⚠️ DETECTAR VARIABLES DE WIALON NO REEMPLAZADAS
+        if value.startswith("%") and value.endswith("%"):
+            logger.warning(
+                "wialon_variable_not_replaced",
+                field=key,
+                value=value,
+                message=f"Variable de Wialon '{value}' no fue reemplazada. Verifica la configuración en Wialon."
+            )
+            # Mantener string para visibilidad en logs y normalización posterior
             result[key] = value
+            continue
+
+        if key in NUMERIC_FIELDS:
+            numeric_value = _sanitize_numeric_string(value)
+            if numeric_value is not None:
+                try:
+                    if "." in numeric_value:
+                        result[key] = float(numeric_value)
+                    else:
+                        result[key] = int(numeric_value)
+                    continue
+                except ValueError:
+                    # Si aún así falla, mantener string original para visibilidad.
+                    logger.warning(
+                        "wialon_numeric_conversion_failed",
+                        field=key,
+                        value=value,
+                        numeric_value=numeric_value,
+                    )
+        result[key] = value
 
     return result
 
@@ -120,7 +183,7 @@ def normalize_wialon_event(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         "pos_time": raw_data.get("pos_time"),
         "driver_name": raw_data.get("driver_name"),
         "driver_code": str(raw_data.get("driver_code", "")) if raw_data.get("driver_code") is not None else None,
-        "geofence_name": raw_data.get("geofence_name"),
+        "geofence_name": _clean_placeholder(raw_data.get("geofence_name")),
         "geofence_id": str(raw_data.get("geofence_id", "")) if raw_data.get("geofence_id") is not None else None,
         "max_speed": float(raw_data.get("max_speed", 0)) if raw_data.get("max_speed") else None,
         "deviation_distance_km": float(raw_data.get("deviation_distance_km", 0)) 
