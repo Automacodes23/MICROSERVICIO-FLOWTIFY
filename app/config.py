@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     webhooks_enabled: bool = True
     webhooks_enabled_tenants: str = "24"  # Comma-separated tenant IDs
 
+    # Período de gracia para notificaciones de desviación de ruta (en segundos)
+    route_deviation_grace_period: int = 300  # 5 minutos por defecto
+
     # Sentry (opcional)
     sentry_dsn: Optional[str] = None
     

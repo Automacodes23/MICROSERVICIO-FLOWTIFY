@@ -824,6 +824,68 @@ class WebhookService:
             trip_id=trip_id,
         )
     
+    async def send_route_return(
+        self,
+        event_id: str,
+        trip_id: str,
+        return_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Enviar webhook de regreso a ruta después de una desviación
+        
+        Args:
+            event_id: UUID del evento
+            trip_id: UUID del viaje
+            return_data: Datos del regreso a ruta
+            
+        Returns:
+            Resultado del envío
+        """
+        trip_data = await self._fetch_trip_complete_data(trip_id)
+        
+        if not self._is_enabled_for_tenant(trip_data.get("tenant_id", 0)):
+            return {"success": False, "error": "Webhooks disabled for tenant"}
+        
+        payload = {
+            "event": "route_return",  # Tipo de evento: regreso a ruta
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "tenant_id": trip_data.get("tenant_id"),
+            "deviation": {
+                "type": "route_return",  # Tipo: regreso a ruta
+                "severity": "info",  # Severidad: informativo (ya regresó)
+                "deviation_id": f"route_return_{event_id}",
+                "distance_from_route_meters": 0,  # Ya está en ruta
+                "max_allowed_deviation": return_data.get("max_allowed", 100),
+                "excess_deviation_meters": 0,  # No hay exceso, ya regresó
+                "deviation_duration_seconds": return_data.get("deviation_duration_seconds", 0),  # Duración de la desviación previa
+                "current_location": return_data.get("current_location", {}),
+                "nearest_point_on_route": return_data.get("nearest_point", {}),
+                "previous_deviation_id": return_data.get("previous_deviation_id"),  # ID de la desviación previa
+            },
+            "trip": self._format_trip_summary(trip_data),
+            "driver": self._format_driver_data(trip_data.get("driver")),
+            "unit": self._format_unit_data(trip_data.get("unit")),
+            "route_info": {},  # TODO: Calcular route progress
+            "immediate_actions": {
+                "supervisor_notified": False,  # No requiere notificación crítica
+                "driver_contact_attempted": False,
+                "whatsapp_alert_sent": False,
+                "flowtify_critical_alert": False,
+            },
+            "wialon_source": {
+                "notification_id": return_data.get("notification_id"),
+                "notification_type": "position_update",
+                "external_id": return_data.get("external_id"),
+            },
+        }
+        
+        return await self._send_webhook_with_retry(
+            endpoint="/route-return",  # Endpoint diferente para regreso
+            payload=payload,
+            webhook_type="route_return",  # Tipo de webhook: route_return
+            trip_id=trip_id,
+        )
+    
     async def send_communication_response(
         self,
         trip_id: str,
