@@ -44,7 +44,11 @@ GEOFENCE_ROLES = {
     "UNLOADING": "unloading",
     "WAYPOINT": "waypoint",
     "DEPOT": "depot",
+    "ROUTE": "route",
 }
+
+# Período de gracia para notificaciones de desviación de ruta (en segundos)
+ROUTE_DEVIATION_GRACE_PERIOD = 300  # 5 minutos
 
 # Intenciones de mensajes (Gemini AI)
 MESSAGE_INTENTS = {

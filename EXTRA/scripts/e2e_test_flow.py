@@ -116,7 +116,14 @@ GEOFENCE_ROUTE = {
     "geofence_name": "RUTA",
     "geofence_type": "polygon",
     "order": 2,
-    # Coordenadas FUERA de ruta para simular desvío
+    # Coordenadas DENTRO de ruta (para simular entrada)
+    "test_coordinates": {
+        "latitude": 21.0234,
+        "longitude": -101.9567,
+        "altitude": 1800,
+        "address": "Carretera Principal (dentro de RUTA)"
+    },
+    # Coordenadas FUERA de ruta para simular desvío (salida)
     "deviation_coordinates": {
         "latitude": 20.9234,
         "longitude": -102.1567,
@@ -490,7 +497,7 @@ def print_step(title, char="="):
     log_to_file(f"{line}\n")
 
 
-def print_progress(current_phase, total_phases=8):
+def print_progress(current_phase, total_phases=9):
     """Muestra barra de progreso del test"""
     filled = "█" * current_phase
     empty = "░" * (total_phases - current_phase)
@@ -1024,7 +1031,7 @@ def handle_error(phase, success, response_data, status_code):
 
 def fase_1_crear_viaje():
     """Crear viaje desde Floatify"""
-    print_progress(1, 8)
+    print_progress(1, 9)
     print_step("FASE 1: CREACIÓN DE VIAJE (Simula Floatify)")
     
     # Construir payload completo usando variables globales
@@ -1191,7 +1198,7 @@ def fase_1_crear_viaje():
 
 def fase_2_iniciar_viaje(trip_id):
     """Iniciar viaje (simula escaneo QR)"""
-    print_progress(2, 8)
+    print_progress(2, 9)
     print_step("FASE 2: INICIO DE VIAJE (Simula Escaneo QR)")
     
     print(f"Iniciando viaje con ID: {Colors.BOLD}{trip_id}{Colors.ENDC}")
@@ -1233,7 +1240,7 @@ def fase_2_iniciar_viaje(trip_id):
 
 def fase_3_llegada_carga():
     """Simular llegada a zona de carga (evento Wialon)"""
-    print_progress(3, 8)
+    print_progress(3, 9)
     print_step("FASE 3: EVENTO WIALON - LLEGADA A ZONA DE CARGA")
     
     # Pequeña pausa para asegurar que el viaje esté completamente creado en BD
@@ -1344,7 +1351,7 @@ def fase_4_interaccion_carga(trip_id, group_id):
 
 def fase_5_salida_carga():
     """Simular salida de zona de carga (evento Wialon)"""
-    print_progress(5, 8)
+    print_progress(5, 9)
     print_step("FASE 5: EVENTO WIALON - SALIDA DE ZONA DE CARGA")
     
     # Construir payload usando la función helper (modo realista de Wialon)
@@ -1392,37 +1399,28 @@ def fase_5_salida_carga():
 
 
 # =============================================================================
-# FASE 5.5: EVENTO WIALON - DESVÍO DE RUTA (NUEVO)
+# FASE 5.5: EVENTO WIALON - ENTRADA A GEOCERCA DE RUTA (Comportamiento Normal)
 # =============================================================================
 
-def fase_5_5_desvio_ruta(trip_id):
-    """Simular desvío de ruta (evento Wialon)"""
-    print_progress(6, 8)  # Fase 5.5 cuenta como la sexta fase
-    print_step("FASE 5.5: EVENTO WIALON - DESVÍO DE RUTA DETECTADO")
+def fase_5_5_entrada_ruta(trip_id):
+    """Simular entrada a geocerca de ruta (comportamiento normal)"""
+    print_progress(5, 9)  # Fase 5.5 es la quinta fase
+    print_step("FASE 5.5: EVENTO WIALON - ENTRADA A GEOCERCA DE RUTA")
     
-    print(f"{Colors.WARNING}📍 SIMULACIÓN DE DESVÍO:{Colors.ENDC}")
-    print(f"  El conductor salió de la ruta esperada ({GEOFENCE_ROUTE['geofence_name']})")
-    print(f"  Wialon detecta que el vehículo está fuera del corredor definido")
-    print(f"  Se generará una alerta al supervisor y webhook a Flowtify\n")
+    print(f"{Colors.OKGREEN}📍 SIMULACIÓN DE ENTRADA A RUTA:{Colors.ENDC}")
+    print(f"  El conductor entró a la ruta esperada ({GEOFENCE_ROUTE['geofence_name']})")
+    print(f"  Wialon detecta que el vehículo está dentro del corredor definido")
+    print(f"  Este es un comportamiento normal - NO debe generar alertas\n")
     
-    # Construir payload de desvío usando la función helper
-    dev_coords = GEOFENCE_ROUTE["deviation_coordinates"]
-    
+    # Construir payload de entrada usando la función helper
     data = build_wialon_event_payload(
         geofence=GEOFENCE_ROUTE,
-        notification_type="route_deviation",
-        coords=dev_coords,
-        speed=65.3
+        notification_type="geofence_entry",
+        coords=GEOFENCE_ROUTE["test_coordinates"],
+        speed=55.0
     )
     
-    # Agregar campos específicos de desviación (si están en modo completo)
-    if not WIALON_REALISTIC_MODE:
-        data.update({
-            "deviation_distance": dev_coords["deviation_distance"],
-            "deviation_duration": dev_coords["deviation_duration"]
-        })
-    
-    print_payload(data, "Evento Wialon (Desvío de Ruta)")
+    print_payload(data, "Evento Wialon (Entrada a Geocerca de Ruta)")
     
     # IMPORTANTE: Usar data= para form-urlencoded, NO json=
     success, response_data, status_code = make_request(
@@ -1434,22 +1432,91 @@ def fase_5_5_desvio_ruta(trip_id):
     
     handle_error("FASE 5.5", success, response_data, status_code)
     
+    print(f"\n{Colors.OKGREEN}[OK] Entrada a geocerca de ruta simulada{Colors.ENDC}")
+    print(f"  Geocerca: {Colors.BOLD}{GEOFENCE_ROUTE['geofence_name']}{Colors.ENDC}")
+    print(f"  Ubicación: {Colors.BOLD}{GEOFENCE_ROUTE['test_coordinates']['address']}{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}NOTA: Este es comportamiento normal - NO debe cambiar estado del viaje{Colors.ENDC}")
+    
+    # Verificar que se envía webhook geofence_transition (pero NO route_deviation)
+    time.sleep(2)  # Esperar a que webhook se procese
+    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 5.5 - Entrada a Ruta", expect_geofence=True)
+    
+    # Verificar que NO se cambia el estado del viaje
+    print(f"\n{Colors.OKCYAN}>>> Verificando que el estado del viaje NO cambió...{Colors.ENDC}")
+    check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+    print(f"{Colors.OKGREEN}✓ Estado del viaje se mantiene igual (correcto){Colors.ENDC}\n")
+    
+    # ⏸️ PAUSA CONTROLADA
+    wait_for_user(
+        f"FASE 5.5 COMPLETADA - Entrada a geocerca de ruta.\n"
+        f"  - Evento Wialon procesado: geofence_entry a {GEOFENCE_ROUTE['geofence_name']}\n"
+        f"  - Estado del viaje NO cambió (correcto)\n"
+        f"  - Se envió webhook geofence_transition (pero NO route_deviation)\n"
+        f"  - Verifica arriba los webhooks\n"
+        f"  ➡️  SIGUIENTE: Simular DESVÍO DE RUTA (salida de geocerca)"
+    )
+
+
+# =============================================================================
+# FASE 5.6: EVENTO WIALON - DESVÍO DE RUTA DETECTADO (Salida de Geocerca de Ruta)
+# =============================================================================
+
+def fase_5_6_desvio_ruta(trip_id):
+    """Simular desvío de ruta mediante salida de geocerca de ruta (geofence_exit)"""
+    print_progress(6, 9)  # Fase 5.6 es la sexta fase
+    print_step("FASE 5.6: EVENTO WIALON - DESVÍO DE RUTA DETECTADO (Salida de Geocerca)")
+    
+    print(f"{Colors.WARNING}📍 SIMULACIÓN DE DESVÍO:{Colors.ENDC}")
+    print(f"  El conductor salió de la ruta esperada ({GEOFENCE_ROUTE['geofence_name']})")
+    print(f"  Wialon detecta que el vehículo está fuera del corredor definido")
+    print(f"  Se generará una alerta al supervisor y webhook a Flowtify\n")
+    print(f"{Colors.BOLD}IMPORTANTE:{Colors.ENDC}")
+    print(f"  - Se detecta mediante geofence_exit con role='route'")
+    print(f"  - Se envía notificación WhatsApp")
+    print(f"  - Se envían webhooks: geofence_transition Y route_deviation")
+    print(f"  - El estado del viaje NO debe cambiar\n")
+    
+    # Construir payload de salida usando la función helper
+    dev_coords = GEOFENCE_ROUTE["deviation_coordinates"]
+    
+    data = build_wialon_event_payload(
+        geofence=GEOFENCE_ROUTE,
+        notification_type="geofence_exit",  # NUEVO: Usar geofence_exit en lugar de route_deviation
+        coords=dev_coords,
+        speed=65.3
+    )
+    
+    print_payload(data, "Evento Wialon (Salida de Geocerca de Ruta - Desviación)")
+    
+    # IMPORTANTE: Usar data= para form-urlencoded, NO json=
+    success, response_data, status_code = make_request(
+        "POST",
+        "/wialon/events",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    
+    handle_error("FASE 5.6", success, response_data, status_code)
+    
     dev_coords = GEOFENCE_ROUTE["deviation_coordinates"]
     print(f"\n{Colors.FAIL}⚠️  DESVÍO DE RUTA DETECTADO{Colors.ENDC}")
-    print(f"  Distancia de desviación: {Colors.BOLD}{dev_coords['deviation_distance']/1000:.1f} km{Colors.ENDC}")
-    print(f"  Tiempo desviado: {Colors.BOLD}{dev_coords['deviation_duration']//60} minutos{Colors.ENDC}")
+    print(f"  Geocerca: {Colors.BOLD}{GEOFENCE_ROUTE['geofence_name']}{Colors.ENDC}")
     print(f"  Ubicación actual: {Colors.BOLD}{dev_coords['address']}{Colors.ENDC}")
-    print(f"  Ruta esperada: {Colors.BOLD}{GEOFENCE_ROUTE['geofence_name']}{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}NOTA: El estado del viaje NO debe cambiar{Colors.ENDC}")
     
-    # Verificar que el webhook de route_deviation se envió
-    time.sleep(2)  # Esperar a que webhook se procese
+    # Verificar que el estado del viaje NO cambió
+    print(f"\n{Colors.OKCYAN}>>> Verificando que el estado del viaje NO cambió...{Colors.ENDC}")
+    time.sleep(2)  # Esperar a que se procese el evento
+    check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+    print(f"{Colors.OKGREEN}✓ Estado del viaje se mantiene igual (correcto){Colors.ENDC}\n")
     
+    # Verificar que se enviaron los webhooks
     print(f"\n{Colors.OKCYAN}{'='*80}")
-    print(f"  VERIFICACIÓN CRÍTICA: WEBHOOK DE DESVÍO DE RUTA")
+    print(f"  VERIFICACIÓN CRÍTICA: WEBHOOKS DE DESVÍO DE RUTA")
     print(f"{'='*80}{Colors.ENDC}")
     
-    # Verificar webhooks enviados
-    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 5.5 - Desvío de Ruta", expect_geofence=False)
+    # Verificar webhooks enviados (esperamos geofence_transition Y route_deviation)
+    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 5.6 - Desvío de Ruta", expect_geofence=True)
     
     # Búsqueda específica de webhook route_deviation
     print(f"\n{Colors.BOLD}🔍 BÚSQUEDA ESPECÍFICA DE WEBHOOK route_deviation:{Colors.ENDC}")
@@ -1462,32 +1529,238 @@ def fase_5_5_desvio_ruta(trip_id):
         
         if response.status_code == 200:
             data_response = response.json()
-            count = data_response.get('count', 0)
+            logs = data_response.get('logs', [])
+            count = len(logs)
             
             if count > 0:
                 print(f"{Colors.OKGREEN}✓ Encontrado {count} webhook(s) de route_deviation para este viaje{Colors.ENDC}")
-                for log in data_response.get('logs', []):
+                for log in logs:
                     payload = json.loads(log['payload']) if isinstance(log['payload'], str) else log['payload']
+                    deviation = payload.get('deviation', {})
                     location = payload.get('location', {})
-                    print(f"  - Status: {log['status']}")
+                    print(f"  - Status: {Colors.OKGREEN if log['status'] == 'sent' else Colors.FAIL}{log['status']}{Colors.ENDC}")
                     print(f"  - Ubicación: {location.get('address', 'N/A')}")
-                    print(f"  - Desviación: {payload.get('deviation', {}).get('distance_meters', 'N/A')} metros")
+                    print(f"  - Distancia: {deviation.get('distance_from_route_meters', 'N/A')} metros")
+                    print(f"  - Severidad: {deviation.get('severity', 'N/A')}")
                     log_to_file(f"Route deviation webhook: Status={log['status']}, Payload={json.dumps(payload)}", "ROUTE_DEVIATION_WEBHOOK")
             else:
                 print(f"{Colors.FAIL}✗ NO se encontraron webhooks de route_deviation{Colors.ENDC}")
                 print(f"{Colors.WARNING}  Esto indica que EventService NO procesó correctamente el evento{Colors.ENDC}")
+                print(f"{Colors.WARNING}  Verifica que el role de la geocerca sea 'route' en la BD{Colors.ENDC}")
                 log_to_file("NO HAY webhooks de route_deviation en la BD", "CRITICAL")
         
     except Exception as e:
         print(f"{Colors.WARNING}⚠ Error al buscar route_deviation webhooks: {e}{Colors.ENDC}")
     
+    # Verificar que también se envió geofence_transition
+    print(f"\n{Colors.BOLD}🔍 VERIFICACIÓN DE WEBHOOK geofence_transition:{Colors.ENDC}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/webhooks/delivery-log",
+            params={"webhook_type": "geofence_transition", "trip_id": trip_id, "limit": 10},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data_response = response.json()
+            logs = data_response.get('logs', [])
+            # Buscar el más reciente que sea de tipo "exit" y role="route"
+            recent_exit = None
+            for log in logs:
+                payload = json.loads(log['payload']) if isinstance(log['payload'], str) else log['payload']
+                geofence = payload.get('geofence', {})
+                if payload.get('transition_type') == 'exit' and geofence.get('role') == 'route':
+                    recent_exit = log
+                    break
+            
+            if recent_exit:
+                print(f"{Colors.OKGREEN}✓ Encontrado webhook geofence_transition (exit, role=route){Colors.ENDC}")
+                print(f"  - Status: {Colors.OKGREEN if recent_exit['status'] == 'sent' else Colors.FAIL}{recent_exit['status']}{Colors.ENDC}")
+                payload = json.loads(recent_exit['payload']) if isinstance(recent_exit['payload'], str) else recent_exit['payload']
+                geofence = payload.get('geofence', {})
+                print(f"  - Geocerca: {geofence.get('name', 'N/A')}")
+                print(f"  - Role: {geofence.get('role', 'N/A')}")
+                print(f"  - Tipo: {geofence.get('type', 'N/A')}")
+            else:
+                print(f"{Colors.WARNING}⚠ No se encontró webhook geofence_transition reciente con role=route{Colors.ENDC}")
+        
+    except Exception as e:
+        print(f"{Colors.WARNING}⚠ Error al buscar geofence_transition webhooks: {e}{Colors.ENDC}")
+    
+    # Verificar notificación WhatsApp
+    print(f"\n{Colors.BOLD}📱 VERIFICACIÓN DE NOTIFICACIÓN WHATSAPP:{Colors.ENDC}")
+    print(f"  {Colors.WARNING}Revisa tu WhatsApp: ¿Recibiste notificación de desviación?{Colors.ENDC}")
+    print(f"  Formato esperado: '⚠️ Desviación de ruta detectada. El vehículo salió de {GEOFENCE_ROUTE['geofence_name']}. Ubicación actual: {dev_coords['address']}'")
+    print(f"  {Colors.OKCYAN}NOTA: La notificación puede tardar unos segundos en llegar{Colors.ENDC}\n")
+    
     # ⏸️ PAUSA CONTROLADA
     wait_for_user(
-        f"FASE 5.5 COMPLETADA - DESVÍO DE RUTA DETECTADO.\n"
-        f"  - ⚠️  Evento crítico procesado: route_deviation\n"
-        f"  - Desviación: {dev_coords['deviation_distance']/1000:.1f} km fuera de {GEOFENCE_ROUTE['geofence_name']}\n"
+        f"FASE 5.6 COMPLETADA - DESVÍO DE RUTA DETECTADO.\n"
+        f"  - ⚠️  Evento procesado: geofence_exit de {GEOFENCE_ROUTE['geofence_name']}\n"
+        f"  - Estado del viaje NO cambió (correcto)\n"
         f"  - Revisa WhatsApp: ¿Recibiste alerta del bot?\n"
-        f"  - Verifica arriba el webhook route_deviation a Flowtify\n"
+        f"  - Verifica arriba los webhooks (geofence_transition Y route_deviation)\n"
+        f"  ➡️  SIGUIENTE: Probar período de gracia (salida múltiple)"
+    )
+
+
+# =============================================================================
+# FASE 5.7: EVENTO WIALON - PERÍODO DE GRACIA (Múltiples Salidas)
+# =============================================================================
+
+def fase_5_7_periodo_gracia(trip_id):
+    """Simular período de gracia: segunda salida de geocerca de ruta (no debe enviar notificación)"""
+    print_progress(7, 9)  # Fase 5.7 es la séptima fase
+    print_step("FASE 5.7: EVENTO WIALON - PERÍODO DE GRACIA (Segunda Salida)")
+    
+    print(f"{Colors.WARNING}📍 SIMULACIÓN DE PERÍODO DE GRACIA:{Colors.ENDC}")
+    print(f"  El conductor sale nuevamente de la ruta esperada ({GEOFENCE_ROUTE['geofence_name']})")
+    print(f"  Esta es la SEGUNDA salida en menos de 5 minutos")
+    print(f"  {Colors.BOLD}NO debe enviar notificación WhatsApp (período de gracia activo){Colors.ENDC}")
+    print(f"  {Colors.BOLD}SÍ debe enviar webhooks (siempre se envían){Colors.ENDC}\n")
+    
+    # Construir payload de salida usando coordenadas ligeramente diferentes
+    dev_coords = GEOFENCE_ROUTE["deviation_coordinates"].copy()
+    dev_coords["latitude"] += 0.001  # Ligeramente diferente para simular movimiento
+    dev_coords["longitude"] += 0.001
+    dev_coords["address"] = "Carretera Alterna 2 (fuera de RUTA - segunda salida)"
+    
+    data = build_wialon_event_payload(
+        geofence=GEOFENCE_ROUTE,
+        notification_type="geofence_exit",
+        coords=dev_coords,
+        speed=68.5
+    )
+    
+    print_payload(data, "Evento Wialon (Segunda Salida de Geocerca de Ruta)")
+    
+    # IMPORTANTE: Usar data= para form-urlencoded, NO json=
+    success, response_data, status_code = make_request(
+        "POST",
+        "/wialon/events",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    
+    handle_error("FASE 5.7", success, response_data, status_code)
+    
+    print(f"\n{Colors.WARNING}⚠️  SEGUNDA SALIDA DE RUTA DETECTADA{Colors.ENDC}")
+    print(f"  Geocerca: {Colors.BOLD}{GEOFENCE_ROUTE['geofence_name']}{Colors.ENDC}")
+    print(f"  Ubicación actual: {Colors.BOLD}{dev_coords['address']}{Colors.ENDC}")
+    print(f"  {Colors.BOLD}NOTA: Esta salida está dentro del período de gracia (5 minutos){Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}Se espera: NO notificación WhatsApp, SÍ webhooks{Colors.ENDC}\n")
+    
+    # Verificar que el estado del viaje NO cambió
+    print(f"\n{Colors.OKCYAN}>>> Verificando que el estado del viaje NO cambió...{Colors.ENDC}")
+    time.sleep(2)  # Esperar a que se procese el evento
+    check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+    print(f"{Colors.OKGREEN}✓ Estado del viaje se mantiene igual (correcto){Colors.ENDC}\n")
+    
+    # Verificar que se enviaron los webhooks (siempre se envían)
+    print(f"\n{Colors.OKCYAN}{'='*80}")
+    print(f"  VERIFICACIÓN: WEBHOOKS DE SEGUNDA SALIDA")
+    print(f"{'='*80}{Colors.ENDC}")
+    
+    # Verificar webhooks enviados
+    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 5.7 - Período de Gracia", expect_geofence=True)
+    
+    # Verificar que se envió webhook route_deviation (debe enviarse siempre)
+    print(f"\n{Colors.BOLD}🔍 VERIFICACIÓN: Webhook route_deviation debe enviarse (no afectado por período de gracia):{Colors.ENDC}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/webhooks/delivery-log",
+            params={"webhook_type": "route_deviation", "trip_id": trip_id, "limit": 10},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data_response = response.json()
+            logs = data_response.get('logs', [])
+            count = len(logs)
+            
+            if count >= 2:
+                print(f"{Colors.OKGREEN}✓ Encontrados {count} webhook(s) de route_deviation (incluye segunda salida){Colors.ENDC}")
+                print(f"  {Colors.OKCYAN}NOTA: Los webhooks siempre se envían, independientemente del período de gracia{Colors.ENDC}")
+            else:
+                print(f"{Colors.WARNING}⚠ Solo se encontraron {count} webhook(s) de route_deviation{Colors.ENDC}")
+                print(f"  {Colors.WARNING}Se esperaba al menos 2 (primera y segunda salida){Colors.ENDC}")
+        
+    except Exception as e:
+        print(f"{Colors.WARNING}⚠ Error al verificar webhooks: {e}{Colors.ENDC}")
+    
+    # Verificar notificación WhatsApp (NO debe enviarse)
+    print(f"\n{Colors.BOLD}📱 VERIFICACIÓN DE NOTIFICACIÓN WHATSAPP:{Colors.ENDC}")
+    print(f"  {Colors.WARNING}Revisa tu WhatsApp: ¿Recibiste SEGUNDA notificación de desviación?{Colors.ENDC}")
+    print(f"  {Colors.BOLD}Se espera: NO debe enviarse segunda notificación (período de gracia activo){Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}NOTA: Si recibes segunda notificación, el período de gracia no está funcionando{Colors.ENDC}\n")
+    
+    # ⏸️ PAUSA CONTROLADA
+    wait_for_user(
+        f"FASE 5.7 COMPLETADA - PERÍODO DE GRACIA PROBADO.\n"
+        f"  - ⚠️  Segunda salida procesada: geofence_exit de {GEOFENCE_ROUTE['geofence_name']}\n"
+        f"  - Estado del viaje NO cambió (correcto)\n"
+        f"  - Revisa WhatsApp: ¿NO recibiste segunda notificación? (correcto)\n"
+        f"  - Verifica arriba los webhooks (deben enviarse siempre)\n"
+        f"  ➡️  SIGUIENTE: Simular regreso a ruta (entrada a geocerca)"
+    )
+
+
+# =============================================================================
+# FASE 5.8: EVENTO WIALON - REGRESO A RUTA (Entrada a Geocerca de Ruta)
+# =============================================================================
+
+def fase_5_8_regreso_ruta(trip_id):
+    """Simular regreso a ruta (entrada a geocerca de ruta después de desvío)"""
+    print_progress(8, 9)  # Fase 5.8 es la octava fase
+    print_step("FASE 5.8: EVENTO WIALON - REGRESO A RUTA")
+    
+    print(f"{Colors.OKGREEN}📍 SIMULACIÓN DE REGRESO A RUTA:{Colors.ENDC}")
+    print(f"  El conductor regresó a la ruta esperada ({GEOFENCE_ROUTE['geofence_name']})")
+    print(f"  Wialon detecta que el vehículo está dentro del corredor definido")
+    print(f"  Este es un comportamiento normal - NO debe generar alertas\n")
+    
+    # Construir payload de entrada usando la función helper
+    data = build_wialon_event_payload(
+        geofence=GEOFENCE_ROUTE,
+        notification_type="geofence_entry",
+        coords=GEOFENCE_ROUTE["test_coordinates"],
+        speed=58.2
+    )
+    
+    print_payload(data, "Evento Wialon (Regreso a Geocerca de Ruta)")
+    
+    # IMPORTANTE: Usar data= para form-urlencoded, NO json=
+    success, response_data, status_code = make_request(
+        "POST",
+        "/wialon/events",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    
+    handle_error("FASE 5.8", success, response_data, status_code)
+    
+    print(f"\n{Colors.OKGREEN}[OK] Regreso a geocerca de ruta simulada{Colors.ENDC}")
+    print(f"  Geocerca: {Colors.BOLD}{GEOFENCE_ROUTE['geofence_name']}{Colors.ENDC}")
+    print(f"  Ubicación: {Colors.BOLD}{GEOFENCE_ROUTE['test_coordinates']['address']}{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}NOTA: Este es comportamiento normal - NO debe cambiar estado del viaje{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}NOTA: NO se envía webhook route_deviation (solo para salidas){Colors.ENDC}")
+    
+    # Verificar que se envía webhook geofence_transition (pero NO route_deviation)
+    time.sleep(2)  # Esperar a que webhook se procese
+    check_webhooks_sent(trip_id=trip_id, fase_name="FASE 5.8 - Regreso a Ruta", expect_geofence=True)
+    
+    # Verificar que NO se cambia el estado del viaje
+    print(f"\n{Colors.OKCYAN}>>> Verificando que el estado del viaje NO cambió...{Colors.ENDC}")
+    check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+    print(f"{Colors.OKGREEN}✓ Estado del viaje se mantiene igual (correcto){Colors.ENDC}\n")
+    
+    # ⏸️ PAUSA CONTROLADA
+    wait_for_user(
+        f"FASE 5.8 COMPLETADA - Regreso a geocerca de ruta.\n"
+        f"  - Evento Wialon procesado: geofence_entry a {GEOFENCE_ROUTE['geofence_name']}\n"
+        f"  - Estado del viaje NO cambió (correcto)\n"
+        f"  - Se envió webhook geofence_transition (pero NO route_deviation)\n"
+        f"  - Verifica arriba los webhooks\n"
         f"  ➡️  SIGUIENTE: Simular llegada a zona de descarga"
     )
 
@@ -1498,7 +1771,7 @@ def fase_5_5_desvio_ruta(trip_id):
 
 def fase_6_llegada_descarga():
     """Simular llegada a zona de descarga (evento Wialon)"""
-    print_progress(7, 8)  # Fase 6 es la séptima con la 5.5
+    print_progress(9, 9)  # Fase 6 es la novena fase (después de 5.5, 5.6, 5.7, 5.8)
     print_step("FASE 6: EVENTO WIALON - LLEGADA A ZONA DE DESCARGA")
     
     # Construir payload usando la función helper (modo realista de Wialon)
@@ -1545,7 +1818,7 @@ def fase_6_llegada_descarga():
 
 def fase_7_interaccion_cierre():
     """Usuario envía mensajes finalizando el viaje"""
-    print_progress(8, 8)  # Última fase antes del resumen
+    print_progress(7, 9)  # Fase 7 - Interacción de cierre
     print_step("FASE 7: INTERACCIÓN DEL CONDUCTOR (Cierre de Viaje)")
     
     print(f"{Colors.BOLD}ACCIÓN REQUERIDA DEL USUARIO - FINALIZACIÓN{Colors.ENDC}\n")
@@ -1588,7 +1861,7 @@ def fase_7_interaccion_cierre():
 
 def fase_8_finalizacion(trip_id, trip_code):
     """Mostrar resumen final del test"""
-    print(f"\n{Colors.OKCYAN}Progreso del Test E2E: [████████] 100% (8/8 fases completadas){Colors.ENDC}\n")
+    print(f"\n{Colors.OKCYAN}Progreso del Test E2E: [█████████] 100% (9/9 fases completadas){Colors.ENDC}\n")
     print_step("FASE 8: PRUEBA E2E COMPLETADA", char="*")
     
     print(f"{Colors.OKGREEN}{Colors.BOLD}¡FLUJO E2E COMPLETADO EXITOSAMENTE!{Colors.ENDC}\n")
@@ -1794,7 +2067,7 @@ def main():
         # ===========================================================
         # FASE 4: Interacción usuario - Carga (GRANULAR)
         # ===========================================================
-        print_progress(4, 8)
+        print_progress(4, 9)
         print_step("FASE 4: INTERACCIÓN DEL CONDUCTOR (Proceso de Carga)")
         
         print(f"{Colors.BOLD}INSTRUCCIONES:{Colors.ENDC}")
@@ -1838,13 +2111,37 @@ def main():
         
         print(f"\n{Colors.OKCYAN}✓ Estado de BD verificado correctamente{Colors.ENDC}")
         
-        # FASE 5.5: Desvío de ruta (Wialon) - NUEVO
-        fase_5_5_desvio_ruta(trip_id)
+        # FASE 5.5: Entrada a geocerca de ruta (comportamiento normal)
+        fase_5_5_entrada_ruta(trip_id)
+        
+        # Verificar estado después de entrada a ruta (debería mantenerse igual)
+        check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+        
+        print(f"\n{Colors.OKCYAN}✓ Estado de BD verificado correctamente (sin cambios tras entrada a ruta){Colors.ENDC}")
+        
+        # FASE 5.6: Desvío de ruta - Salida de geocerca de ruta (Wialon) - NUEVO
+        fase_5_6_desvio_ruta(trip_id)
         
         # Verificar estado después del desvío (debería mantenerse igual)
         check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
         
         print(f"\n{Colors.OKCYAN}✓ Estado de BD verificado correctamente (sin cambios tras desvío){Colors.ENDC}")
+        
+        # FASE 5.7: Período de gracia - Segunda salida (Wialon) - NUEVO
+        fase_5_7_periodo_gracia(trip_id)
+        
+        # Verificar estado después de segunda salida (debería mantenerse igual)
+        check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+        
+        print(f"\n{Colors.OKCYAN}✓ Estado de BD verificado correctamente (sin cambios tras segunda salida){Colors.ENDC}")
+        
+        # FASE 5.8: Regreso a ruta - Entrada a geocerca de ruta (Wialon) - NUEVO
+        fase_5_8_regreso_ruta(trip_id)
+        
+        # Verificar estado después de regreso a ruta (debería mantenerse igual)
+        check_db_status(trip_id, "en_ruta_destino", "rumbo_a_descarga")
+        
+        print(f"\n{Colors.OKCYAN}✓ Estado de BD verificado correctamente (sin cambios tras regreso a ruta){Colors.ENDC}")
         
         # FASE 6: Llegada a descarga (Wialon)
         fase_6_llegada_descarga()
@@ -1857,7 +2154,7 @@ def main():
         # ===========================================================
         # FASE 7: Interacción usuario - Cierre (GRANULAR)
         # ===========================================================
-        print_progress(8, 8)
+        print_progress(7, 9)  # Fase 7 - Interacción de cierre
         print_step("FASE 7: INTERACCIÓN DEL CONDUCTOR (Cierre de Viaje)")
         
         print(f"{Colors.BOLD}INSTRUCCIONES:{Colors.ENDC}")
